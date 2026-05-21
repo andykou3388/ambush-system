@@ -1,0 +1,65 @@
+# Docker Compose 檔案 - 開發環境
+version: '3.8'
+
+services:
+  # 後端服務
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@db:5432/myapp}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - DEBUG=${DEBUG:-true}
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ambush-network
+
+  # 前端服務
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    networks:
+      - ambush-network
+
+  # 數據庫服務
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ambush-network
+
+  # Redis 服務
+  redis:
+    image: redis:6-alpine
+    networks:
+      - ambush-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ambush-network:
+    driver: bridge
