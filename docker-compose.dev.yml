@@ -80,6 +80,30 @@ services:
     networks:
       - ambush-network
 
+  # Celery Worker 服務
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - DEBUG=${DEBUG:-true}
+    volumes:
+      - ./backend/app:/app/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    command: celery -A app.celery_app worker --loglevel=info
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ambush-network
+
 volumes:
   postgres_data:
 
