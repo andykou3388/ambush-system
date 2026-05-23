@@ -8,7 +8,8 @@ redis_url = "redis://redis:6379/0"
 celery_app = Celery(
     "ambush_system",
     broker=redis_url,
-    backend=redis_url  # 使用 Redis 作為結果後端
+    backend=redis_url,  # 使用 Redis 作為結果後端
+    include=['app.tasks.example_task']  # 直接指定任務模組
 )
 
 # 配置 Celery
@@ -19,6 +20,3 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
 )
-
-# 自動發現任務
-celery_app.autodiscover_tasks(['app.tasks'])

@@ -95,7 +95,7 @@ services:
       - ./backend/app:/app/app
       - /app/__pycache__
       - /app/.pytest_cache
-    command: celery -A app.celery_app worker --loglevel=info
+    command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h
     depends_on:
       db:
         condition: service_healthy
