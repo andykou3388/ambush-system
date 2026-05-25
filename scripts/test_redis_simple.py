@@ -10,7 +10,7 @@ def test_redis_connection():
     try:
         # 嘗試連接到 Redis
         r = redis.Redis(
-            host='localhost',
+            host='redis',
             port=6379,
             decode_responses=True,
             socket_connect_timeout=5,

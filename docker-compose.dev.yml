@@ -104,8 +104,46 @@ services:
     networks:
       - ambush-network
 
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: ambush-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - ambush-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: ambush-grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    networks:
+      - ambush-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   ambush-network:
