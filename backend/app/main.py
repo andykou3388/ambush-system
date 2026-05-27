@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import health
 from app.routers.screener import router as screener_router
+from app.routers.stock_detail import router as stock_detail_router
 
 app = FastAPI(
     title="Ambush System API",
@@ -23,3 +24,4 @@ app.add_middleware(
 # 註冊路由
 app.include_router(health.router)
 app.include_router(screener_router)
+app.include_router(stock_detail_router)

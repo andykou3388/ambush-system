@@ -1,4 +1,14 @@
 # Docker Compose 檔案 - 開發環境
+#
+# 使用方式：
+#   使用 podman compose 啟動開發環境容器
+#   podman compose -f docker-compose.dev.yml up -d
+#
+# Python 虛擬環境路徑：
+#   C:\Users\Andy\Documents\ambush-system\ambush-system\.venv
+#
+# 注意：此虛擬環境用於本地開發和腳本執行，
+#      容器內部使用獨立的 Python 環境（基於 Dockerfile 構建）
 
 services:
   # 後端服務
@@ -16,6 +26,9 @@ services:
       - DEBUG=${DEBUG:-true}
     volumes:
       - ./backend/app:/app/app
+      - ./backend/indicators:/app/app/indicators
+      - ./backend/engine:/app/app/engine
+      - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -38,6 +51,11 @@ services:
       - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
     volumes:
       - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
     depends_on:
       - backend
     networks:

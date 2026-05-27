@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 複製原始碼（僅供建置用，開發時會被 volume 覆蓋）
 COPY ./app ./app
+COPY ./indicators ./app/indicators
+COPY ./engine ./app/engine
+COPY ./classifier ./classifier
 
 EXPOSE 8000
 
