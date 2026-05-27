@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import Dashboard from './views/Dashboard.vue'
 
 // API 連接測試狀態
 const apiStatus = ref('未測試')
@@ -36,6 +37,7 @@ async function testApiConnection() {
         <h1 class="text-3xl font-bold text-gray-900">Ambush System</h1>
       </div>
     </header>
+    
     <main>
       <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div class="px-4 py-6 sm:px-0">
@@ -64,10 +66,8 @@ async function testApiConnection() {
             </div>
           </div>
           
-          <!-- 原有內容保持不變 -->
-          <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 flex items-center justify-center">
-            <p class="text-gray-500">歡迎使用 Ambush System 前端</p>
-          </div>
+          <!-- 看板頁面 -->
+          <Dashboard />
         </div>
       </div>
     </main>
