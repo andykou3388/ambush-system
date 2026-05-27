@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import Dashboard from './views/Dashboard.vue'
 
 // API 連接測試狀態
 const apiStatus = ref('未測試')
@@ -34,7 +33,13 @@ async function testApiConnection() {
   <div class="min-h-screen bg-gray-50">
     <header class="bg-white shadow">
       <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <h1 class="text-3xl font-bold text-gray-900">Ambush System</h1>
+        <div class="flex justify-between items-center">
+          <h1 class="text-3xl font-bold text-gray-900">Ambush System</h1>
+          <nav class="flex space-x-4">
+            <router-link to="/" class="text-blue-600 hover:text-blue-800">看板</router-link>
+            <router-link to="/card-demo" class="text-blue-600 hover:text-blue-800">卡片展示</router-link>
+          </nav>
+        </div>
       </div>
     </header>
     
@@ -66,8 +71,8 @@ async function testApiConnection() {
             </div>
           </div>
           
-          <!-- 看板頁面 -->
-          <Dashboard />
+          <!-- 路由視圖 -->
+          <router-view />
         </div>
       </div>
     </main>

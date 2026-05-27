@@ -7,35 +7,18 @@
       </div>
     </div>
     <div class="stock-list p-4">
-      <!-- 此處將嵌入股票卡片組件 -->
+      <!-- 使用新的股票卡片組件 -->
       <div v-if="stocks.length === 0" class="text-center py-8 text-gray-500">
         暫無股票
       </div>
-      <div v-else class="space-y-3">
-        <div 
-          v-for="stock in stocks" 
-          :key="stock.symbol"
-          class="stock-item p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <div class="flex justify-between items-center">
-            <div>
-              <div class="font-medium">{{ stock.symbol }}</div>
-              <div class="text-sm text-gray-500">{{ stock.name }}</div>
-            </div>
-            <div class="text-right">
-              <div class="font-medium">{{ stock.price.toFixed(2) }}</div>
-              <div :class="['text-sm', stock.change >= 0 ? 'text-green-600' : 'text-red-600']">
-                {{ stock.change >= 0 ? '+' : '' }}{{ stock.change }}%
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StockCardList v-else :stocks="stocks" />
     </div>
   </div>
 </template>
 
 <script setup>
+import StockCardList from './StockCardList.vue'
+
 defineProps({
   zone: {
     type: String,
