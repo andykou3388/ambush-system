@@ -54,7 +54,14 @@ const props = defineProps({
 const router = useRouter()
 const isHovered = ref(false)
 
-const zoneLabels = { buy: '買入區', hold: '持有區', sell: '賣出區' }
+const zoneLabels = { 
+  buy: '買入區', 
+  hold: '持有區', 
+  sell: '賣出區',
+  up: '上升區',
+  down: '避雷區',
+  pot: '潛力區'
+}
 
 const changeClass = computed(() => ({
   'text-green-500': props.stock.changePct >= 0,
@@ -74,5 +81,8 @@ function goToDetail() {
 .stock-card.zone-buy { @apply border-l-green-500; }
 .stock-card.zone-hold { @apply border-l-yellow-500; }
 .stock-card.zone-sell { @apply border-l-red-500; }
+.stock-card.zone-up { @apply border-l-green-500; }
+.stock-card.zone-down { @apply border-l-red-500; }
+.stock-card.zone-pot { @apply border-l-blue-500; }
 .stock-card.is-hovered { @apply shadow-md transform -translate-y-0.5; }
 </style>

@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
+import StatCard from '@/components/StatCard.vue'
+import ZonePanel from '@/components/ZonePanel.vue'
 
 // API 連接測試狀態
 const apiStatus = ref('未測試')
@@ -30,7 +32,6 @@ async function testApiConnection() {
 
 // Demo page data
 const activeMenu = ref('dashboard')
-const activeTab = ref('up')
 const showNotifications = ref(false)
 const unreadCount = ref(3)
 const selectedStock = ref(null)
@@ -44,12 +45,6 @@ const menuItems = [
   { id: 'settings', label: '系統設置', icon: 'ph-gear' }
 ]
 
-const tabs = [
-  { id: 'up', label: '⚡ 上升交易區' },
-  { id: 'down', label: '⚠️ 下跌避雷區' },
-  { id: 'pot', label: '🔍 潛力驗證區' }
-]
-
 const notifications = [
   { id: 1, type: 'sell', time: '16:05', title: 'XX科技 離場信號', desc: '連續兩周收於10W均線下方，且放量，建議清倉。' },
   { id: 2, type: 'buy', time: '15:58', title: 'YY生醫 伏擊確認', desc: '縮量回踩10W均線，PE 6.5，符合買入條件。' },
@@ -58,7 +53,7 @@ const notifications = [
 
 const stocks = [
   // UP ZONE (Trading)
-  { ticker: '603123', name: '翠微股份', price: '12.45', change: 1.2, zone: 'up', zoneLabel: '交易區', pe: 8.2, ma10: 11.8, volChange: -45, eps: '15%', mktCap: '32億', insider: '增持', topic: '新零售', lastUpdate: '05/19', 
+  { symbol: '603123', name: '翠微股份', price: 12.45, changePct: 1.2, zone: 'up', zoneLabel: '交易區', pe: 8.2, ma10: 11.8, ma30: 10.5, score: 8.5, volChange: -45, eps: '15%', mktCap: '32億', insider: '增持', topic: '新零售', lastUpdate: '05/19', 
     signals: [
       { type: 'success', text: '收於10W均線之上' },
       { type: 'success', text: '周量萎縮，浮籌清洗' },
@@ -72,7 +67,7 @@ const stocks = [
     ],
     suggestion: '縮量回踩10周均線確認，可分批建倉，嚴守11.0止損。'
   },
-  { ticker: '00258', name: '綠心集團', price: '14.20', change: 0.5, zone: 'up', zoneLabel: '交易區', pe: 9.1, ma10: 13.5, volChange: -60, eps: '22%', mktCap: '45億', insider: '無異動', topic: '環保', lastUpdate: '05/19',
+  { symbol: '00258', name: '綠心集團', price: 14.20, changePct: 0.5, zone: 'up', zoneLabel: '交易區', pe: 9.1, ma10: 13.5, ma30: 12.8, score: 7.8, volChange: -60, eps: '22%', mktCap: '45億', insider: '無異動', topic: '環保', lastUpdate: '05/19',
     signals: [
       { type: 'success', text: '站上30W均線' },
       { type: 'success', text: '缺口未補' },
@@ -86,7 +81,7 @@ const stocks = [
     suggestion: '形態標準，但注意媒體熱度，若放量滯漲需離場。'
   },
   // DOWN ZONE (Warning)
-  { ticker: '88211', name: '瑞風數據', price: '18.50', change: -12.5, zone: 'down', zoneLabel: '避雷區', pe: 45, ma10: 22.0, volChange: 350, eps: '-10%', mktCap: '80億', insider: '減持', topic: 'AI概念', lastUpdate: '05/19',
+  { symbol: '88211', name: '瑞風數據', price: 18.50, changePct: -12.5, zone: 'down', zoneLabel: '避雷區', pe: 45, ma10: 22.0, ma30: 25.5, score: 2.5, volChange: 350, eps: '-10%', mktCap: '80億', insider: '減持', topic: 'AI概念', lastUpdate: '05/19',
     signals: [
       { type: 'warning', text: '跌破10W均線超15%' },
       { type: 'warning', text: '高位放巨量陰線' },
@@ -100,7 +95,7 @@ const stocks = [
     suggestion: '鐵律觸發：跌破均線+放量+內部減持。堅決清倉，不可補倉！'
   },
   // POTENTIAL ZONE
-  { ticker: '300421', name: '力源信息', price: '6.80', change: 0.0, zone: 'pot', zoneLabel: '驗證區', pe: 8.5, ma10: 6.9, volChange: 5, eps: '8%', mktCap: '20億', insider: '回購', topic: '芯片分銷', lastUpdate: '05/19',
+  { symbol: '300421', name: '力源信息', price: 6.80, changePct: 0.0, zone: 'pot', zoneLabel: '驗證區', pe: 8.5, ma10: 6.9, ma30: 7.2, score: 6.5, volChange: 5, eps: '8%', mktCap: '20億', insider: '回購', topic: '芯片分銷', lastUpdate: '05/19',
     signals: [
       { type: 'info', text: '窄幅震盪 > 6個月' },
       { type: 'info', text: '內部人士持續回購' },
@@ -115,9 +110,21 @@ const stocks = [
   }
 ]
 
-const filteredStocks = computed(() => {
-  return stocks.filter(s => s.zone === activeTab.value)
-})
+// 計算屬性：統計數據
+const stats = computed(() => ({
+  upZone: { title: '交易區 (上升趨勢)', value: 12, change: 0, color: 'green', description: '符合「縮量回踩10周均線」條件' },
+  downZone: { title: '避雷區 (下跌警示)', value: 5, change: 0, color: 'red', description: '跌破10周均線或放量滯漲' },
+  potZone: { title: '驗證區 (潛力跟蹤)', value: 28, change: 0, color: 'blue', description: '長期窄底，等待放量啟動' },
+  winRate: { title: '本週勝率預估', value: 78, change: 2, color: 'gold', description: '基於歷史信號回測統計' }
+}))
+
+// 計算屬性：按區域分組的股票
+const stocksByZone = computed(() => ({
+  up: stocks.filter(s => s.zone === 'up'),
+  down: stocks.filter(s => s.zone === 'down'),
+  pot: stocks.filter(s => s.zone === 'pot')
+}))
+
 
 // Methods
 function toggleNotifications() {
@@ -221,151 +228,55 @@ function closeModal() {
         
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div class="bg-trading-panel p-4 rounded-lg border border-trading-border">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-slate-400 text-xs mb-1">交易區 (上升趨勢)</p>
-                <h3 class="text-2xl font-bold text-trading-green mono">12 <span class="text-xs font-normal text-slate-500">只</span></h3>
-              </div>
-              <div class="p-2 bg-green-900/30 rounded text-trading-green"><i class="ph-bold ph-chart-line-up text-lg"></i></div>
-            </div>
-            <p class="text-[10px] text-slate-500 mt-2">符合「縮量回踩10周均線」條件</p>
-          </div>
-          <div class="bg-trading-panel p-4 rounded-lg border border-trading-border">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-slate-400 text-xs mb-1">避雷區 (下跌警示)</p>
-                <h3 class="text-2xl font-bold text-trading-red mono">5 <span class="text-xs font-normal text-slate-500">只</span></h3>
-              </div>
-              <div class="p-2 bg-red-900/30 rounded text-trading-red"><i class="ph-bold ph-shield-warning text-lg"></i></div>
-            </div>
-            <p class="text-[10px] text-slate-500 mt-2">跌破10周均線或放量滯漲</p>
-          </div>
-          <div class="bg-trading-panel p-4 rounded-lg border border-trading-border">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-slate-400 text-xs mb-1">驗證區 (潛力跟蹤)</p>
-                <h3 class="text-2xl font-bold text-trading-blue mono">28 <span class="text-xs font-normal text-slate-500">只</span></h3>
-              </div>
-              <div class="p-2 bg-blue-900/30 rounded text-trading-blue"><i class="ph-bold ph-eye text-lg"></i></div>
-            </div>
-            <p class="text-[10px] text-slate-500 mt-2">長期窄底，等待放量啟動</p>
-          </div>
-          <div class="bg-trading-panel p-4 rounded-lg border border-trading-border">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-slate-400 text-xs mb-1">本週勝率預估</p>
-                <h3 class="text-2xl font-bold text-trading-gold mono">78% <span class="text-xs font-normal text-slate-500">↑</span></h3>
-              </div>
-              <div class="p-2 bg-yellow-900/30 rounded text-trading-gold"><i class="ph-bold ph-target text-lg"></i></div>
-            </div>
-            <p class="text-[10px] text-slate-500 mt-2">基於歷史信號回測統計</p>
-          </div>
+          <StatCard 
+            :title="stats.upZone.title" 
+            :value="stats.upZone.value" 
+            :change="stats.upZone.change"
+            color="green"
+          />
+          <StatCard 
+            :title="stats.downZone.title" 
+            :value="stats.downZone.value" 
+            :change="stats.downZone.change"
+            color="red"
+          />
+          <StatCard 
+            :title="stats.potZone.title" 
+            :value="stats.potZone.value" 
+            :change="stats.potZone.change"
+            color="blue"
+          />
+          <StatCard 
+            :title="stats.winRate.title" 
+            :value="stats.winRate.value" 
+            :change="stats.winRate.change"
+            color="gold"
+          />
         </div>
 
-        <!-- Tabs -->
-        <div class="flex gap-6 border-b border-trading-border mb-4 text-xs font-medium">
-          <button v-for="tab in tabs" :key="tab.id" 
-              class="pb-2 px-1" 
-              :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
-              @click="activeTab = tab.id">
-            <span :class="{'text-green-400': tab.id === 'up', 'text-red-400': tab.id === 'down', 'text-blue-400': tab.id === 'pot'}">{{ tab.label }}</span>
-          </button>
-        </div>
 
-        <!-- Filters (Conditional) -->
-        <div v-if="activeTab === 'up'" class="flex gap-2 mb-4 flex-wrap items-center">
-          <span class="text-xs text-slate-500 mr-2">篩選條件:</span>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> PE < 10
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> 股價 < 15
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> 內部增持
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500"> 流通盤 < 800萬
-          </label>
-        </div>
-
-        <!-- Stock List Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+        <!-- Stock List with Zone Panels -->
+        <div class="space-y-6 mb-6">
+          <!-- Up Zone Panel -->
+          <ZonePanel 
+            zone="up"
+            title="⚡ 上升交易區"
+            :stocks="stocksByZone.up"
+          />
           
-          <!-- Stock Cards -->
-          <div v-for="stock in filteredStocks" :key="stock.ticker" 
-               class="stock-card bg-trading-panel rounded-lg border border-trading-border p-4 relative overflow-hidden cursor-pointer group"
-               @click="openStockDetail(stock)">
-              
-            <!-- Zone Badge -->
-            <div class="absolute top-0 right-0 px-2 py-0.5 text-[10px] font-bold text-white rounded-bl-lg z-10"
-                 :class="{'bg-green-600': stock.zone==='up', 'bg-red-600': stock.zone==='down', 'bg-blue-600': stock.zone==='pot'}">
-              {{ stock.zoneLabel }}
-            </div>
-
-            <!-- Header -->
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 class="text-base font-bold text-white mono">{{ stock.ticker }}</h3>
-                <p class="text-[11px] text-slate-400 truncate max-w-[120px]">{{ stock.name }}</p>
-              </div>
-              <div class="text-right">
-                <p class="text-lg font-bold text-white mono">{{ stock.price }}</p>
-                <p class="text-xs mono flex items-center justify-end" :class="stock.change >= 0 ? 'text-green-400' : 'text-red-400'">
-                  <i :class="['ph-bold', stock.change >= 0 ? 'ph-caret-up' : 'ph-caret-down', 'mr-0.5']"></i>
-                  {{ Math.abs(stock.change) }}%
-                </p>
-              </div>
-            </div>
-
-            <!-- Key Metrics -->
-            <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-xs mb-3">
-              <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
-                <span class="text-slate-500">PE (TTM)</span>
-                <span class="mono font-bold text-slate-200">{{ stock.pe }}</span>
-              </div>
-              <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
-                <span class="text-slate-500">10W MA</span>
-                <span class="mono font-bold text-slate-200">{{ stock.ma10 }}</span>
-              </div>
-              <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
-                <span class="text-slate-500">周量變幅</span>
-                <span class="mono font-bold" :class="stock.volChange > 100 ? 'text-green-400' : 'text-slate-200'">{{ stock.volChange }}%</span>
-              </div>
-              <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
-                <span class="text-slate-500">EPS 增長</span>
-                <span class="mono font-bold text-slate-200">{{ stock.eps }}</span>
-              </div>
-            </div>
-
-            <!-- Signals / Checklist -->
-            <div class="space-y-1.5 mb-3">
-              <div v-for="(signal, idx) in stock.signals" :key="idx" class="flex items-center gap-1.5 text-xs">
-                <i v-if="signal.type === 'success'" class="ph-bold ph-check-circle text-green-500"></i>
-                <i v-else-if="signal.type === 'warning'" class="ph-bold ph-warning text-yellow-500"></i>
-                <i v-else class="ph-bold ph-info text-blue-500"></i>
-                <span class="text-slate-300">{{ signal.text }}</span>
-              </div>
-            </div>
-
-            <!-- Action Hint -->
-            <div class="pt-2 border-t border-slate-700 flex justify-between items-center">
-              <span class="text-[10px] text-slate-500 mono">收盤更新: {{ stock.lastUpdate }}</span>
-              <span class="text-[10px] font-bold text-blue-400 group-hover:text-blue-300 flex items-center gap-1">
-                查看詳情 <i class="ph-bold ph-arrow-right"></i>
-              </span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Empty State -->
-        <div v-if="filteredStocks.length === 0" class="text-center py-20">
-          <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
-            <i class="ph-bold ph-magnifying-glass text-2xl"></i>
-          </div>
-          <p class="text-slate-500">當前板塊無符合條件標的</p>
+          <!-- Down Zone Panel -->
+          <ZonePanel 
+            zone="down"
+            title="⚠️ 下跌避雷區"
+            :stocks="stocksByZone.down"
+          />
+          
+          <!-- Potential Zone Panel -->
+          <ZonePanel 
+            zone="pot"
+            title="🔍 潛力驗證區"
+            :stocks="stocksByZone.pot"
+          />
         </div>
 
       </div>
@@ -381,7 +292,7 @@ function closeModal() {
             <span class="px-2 py-0.5 rounded text-[10px] font-bold text-white" :class="selectedStock.zone === 'up' ? 'bg-green-600' : selectedStock.zone === 'down' ? 'bg-red-600' : 'bg-blue-600'">
               {{ selectedStock.zoneLabel }}
             </span>
-            <h2 class="text-xl font-bold mono text-white">{{ selectedStock.ticker }} <span class="text-sm text-slate-400 font-sans ml-2">{{ selectedStock.name }}</span></h2>
+            <h2 class="text-xl font-bold mono text-white">{{ selectedStock.symbol }} <span class="text-sm text-slate-400 font-sans ml-2">{{ selectedStock.name }}</span></h2>
           </div>
           <button @click="closeModal" class="p-2 hover:bg-slate-700 rounded text-slate-400 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
         </div>
@@ -500,7 +411,7 @@ function closeModal() {
 <style scoped>
 /* Import the necessary styles from the demo */
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-400.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-600.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-600-normal.css');
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.0/latin-400.css');
 
 body { 
@@ -542,28 +453,6 @@ body {
   animation: pulse-ring 2s infinite; 
 }
 
-.tab-active { 
-  border-bottom: 2px solid #3b82f6; 
-  color: #60a5fa; 
-}
-.tab-inactive { 
-  border-bottom: 2px solid transparent; 
-  color: #94a3b8; 
-  transition: all 0.2s; 
-}
-.tab-inactive:hover { 
-  color: #cbd5e1; 
-  border-color: #475569; 
-}
-
-.stock-card { 
-  transition: transform 0.2s, box-shadow 0.2s; 
-}
-.stock-card:hover { 
-  transform: translateY(-2px); 
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); 
-  border-color: #475569; 
-}
 
 /* Trading colors */
 .trading-dark { background-color: #0b1120; }

@@ -1,4 +1,4 @@
-# Docker Compose 檔案 - 開發環境
+# Podman Compose 檔案 - 開發環境
 #
 # 使用方式：
 #   使用 podman compose 啟動開發環境容器
