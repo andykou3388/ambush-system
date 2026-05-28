@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
+from typing import Optional, List
 from app.models.screener import ScreenerRequest, ScreenerResponse, ZoneType, StockItem
 
 router = APIRouter(prefix="/api/v1/screener", tags=["screener"])
@@ -171,3 +171,29 @@ async def screen_stocks(
         page_size=page_size,
         items=paginated_stocks
     )
+
+@router.get("/stocks/batch", response_model=List[StockItem])
+async def batch_get_stocks(
+    symbols: Optional[str] = Query(None, description="股票代碼列表，逗號分隔"),
+    zone: Optional[str] = Query(None, description="區域過濾"),
+):
+    """
+    批量獲取股票數據
+    
+    支援根據股票代碼列表或區域過濾條件獲取多個股票數據。
+    """
+    # 過濾邏輯
+    filtered_stocks = mock_stocks.copy()
+    
+    # 如果提供了股票代碼列表，只返回指定的股票
+    if symbols:
+        symbol_list = symbols.split(',')
+        filtered_stocks = [stock for stock in filtered_stocks if stock.symbol in symbol_list]
+    
+    # 區域過濾
+    if zone:
+        zone_enum = ZoneType(zone)
+        filtered_stocks = [stock for stock in filtered_stocks if stock.zone == zone_enum]
+    
+    # 返回所有匹配的股票
+    return filtered_stocks

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import StatCard from '@/components/StatCard.vue'
 import ZonePanel from '@/components/ZonePanel.vue'
 
@@ -30,13 +30,25 @@ async function testApiConnection() {
   }
 }
 
-// Demo page data
+// Data states
 const activeMenu = ref('dashboard')
 const activeTab = ref('up')
 const showNotifications = ref(false)
 const unreadCount = ref(3)
 const selectedStock = ref(null)
 const chartInitialized = ref(false)
+const stocks = ref([])
+const stats = ref({
+  upZone: { title: '交易區 (上升趨勢)', value: 0, unit: '只', color: 'green', description: '' },
+  downZone: { title: '避雷區 (下跌警示)', value: 0, unit: '只', color: 'red', description: '' },
+  potZone: { title: '驗證區 (潛力跟蹤)', value: 0, unit: '只', color: 'blue', description: '' },
+  winRate: { title: '本週勝率預估', value: 0, unit: '', color: 'gold', description: '' }
+})
+const notifications = ref([])
+
+// Loading states
+const isStocksLoading = ref(false)
+const isStatsLoading = ref(false)
 
 const menuItems = [
   { id: 'dashboard', label: '實盤看板', icon: 'ph-squares-four' },
@@ -52,82 +64,158 @@ const tabs = [
   { id: 'pot', label: '🔍 潛力驗證區' }
 ]
 
-const notifications = [
-  { id: 1, type: 'sell', time: '16:05', title: 'XX科技 離場信號', desc: '連續兩周收於10W均線下方，且放量，建議清倉。' },
-  { id: 2, type: 'buy', time: '15:58', title: 'YY生醫 伏擊確認', desc: '縮量回踩10W均線，PE 6.5，符合買入條件。' },
-  { id: 3, type: 'info', time: '12:00', title: '週報生成完畢', desc: '本週共篩選出 12 只交易區標的，已發送至郵箱。' }
-]
-
-const stocks = [
-  // UP ZONE (Trading)
-  { symbol: '603123', name: '翠微股份1', price: 12.45, changePct: 1.2, zone: 'up', zoneLabel: '交易區', pe: 8.2, ma10: 11.8, ma30: 10.5, score: 8.5, volChange: -45, eps: '15%', mktCap: '32億', insider: '增持', topic: '新零售', lastUpdate: '05/19', 
-    signals: [
-      { type: 'success', text: '收於10W均線之上' },
-      { type: 'success', text: '周量萎縮，浮籌清洗' },
-      { type: 'success', text: 'EPS增長 > 10%' }
-    ],
-    rules: [
-      { label: '神奇支撐', desc: '價格 12.45 > MA10 11.8，支撐有效', pass: true },
-      { label: '縮量確認', desc: '周量低於突破周 50%', pass: true },
-      { label: '估值安全', desc: 'PE 8.2 < 10，安全墊厚', pass: true },
-      { label: '內部資金', desc: '高管近30日增持', pass: true }
-    ],
-    suggestion: '縮量回踩10周均線確認，可分批建倉，嚴守11.0止損。'
-  },
-  { symbol: '00258', name: '綠心2集團', price: 14.20, changePct: 0.5, zone: 'up', zoneLabel: '交易區', pe: 9.1, ma10: 13.5, ma30: 12.8, score: 7.8, volChange: -60, eps: '22%', mktCap: '45億', insider: '無異動', topic: '環保', lastUpdate: '05/19',
-    signals: [
-      { type: 'success', text: '站上30W均線' },
-      { type: 'success', text: '缺口未補' },
-      { type: 'warning', text: '媒體關注度上升' }
-    ],
-    rules: [
-      { label: '趨勢錨點', desc: 'MA30向上，角度45°', pass: true },
-      { label: '量價配合', desc: '缺口後縮量', pass: true },
-      { label: '風險點', desc: '留言板討論增多，需警惕', pass: false }
-    ],
-    suggestion: '形態標準，但注意媒體熱度，若放量滯漲需離場。'
-  },
-  // DOWN ZONE (Warning)
-  { symbol: '88211', name: '瑞風數據', price: 18.50, changePct: -12.5, zone: 'down', zoneLabel: '避雷區', pe: 45, ma10: 22.0, ma30: 25.5, score: 2.5, volChange: 350, eps: '-10%', mktCap: '80億', insider: '減持', topic: 'AI概念', lastUpdate: '05/19',
-    signals: [
-      { type: 'warning', text: '跌破10W均線超15%' },
-      { type: 'warning', text: '高位放巨量陰線' },
-      { type: 'warning', text: '高管減持' }
-    ],
-    rules: [
-      { label: '生命線', desc: '價格 < MA10 22.0，破位嚴重', pass: false },
-      { label: '量價異常', desc: '周量激增，價格下跌', pass: false },
-      { label: '基本面惡化', desc: '業績不及預期', pass: false }
-    ],
-    suggestion: '鐵律觸發：跌破均線+放量+內部減持。堅決清倉，不可補倉！'
-  },
-  // POTENTIAL ZONE
-  { symbol: '300421', name: '力源信息', price: 6.80, changePct: 0.0, zone: 'pot', zoneLabel: '驗證區', pe: 8.5, ma10: 6.9, ma30: 7.2, score: 6.5, volChange: 5, eps: '8%', mktCap: '20億', insider: '回購', topic: '芯片分銷', lastUpdate: '05/19',
-    signals: [
-      { type: 'info', text: '窄幅震盪 > 6個月' },
-      { type: 'info', text: '內部人士持續回購' },
-      { type: 'info', text: '等待放量突破' }
-    ],
-    rules: [
-      { label: '底部結構', desc: '長期橫盤，波幅收窄', pass: true },
-      { label: '籌碼結構', desc: '流通盤小，易撬動', pass: true },
-      { label: '啟動信號', desc: '尚未放量，需跟蹤', pass: false }
-    ],
-    suggestion: '列入觀察池。設置價格提醒：周量放大300%且站上MA30時通知。'
+// Fetch stocks data from API
+async function fetchStocks() {
+  isStocksLoading.value = true
+  try {
+    // Get all stocks from the batch endpoint
+    const response = await fetch('http://localhost:8000/api/v1/screener/stocks/batch')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+    stocks.value = data.map(stock => ({
+      ...stock,
+      zone: stock.zone.toLowerCase(), // Convert zone to lowercase to match frontend expectations
+      zoneLabel: stock.zone === 'BUY' ? '交易區' : stock.zone === 'SELL' ? '避雷區' : '驗證區',
+      // Map additional fields that frontend expects
+      pe: stock.score, // This is a placeholder - real implementation would need actual PE data
+      ma10: stock.ma10,
+      ma30: stock.ma30,
+      score: stock.score,
+      volChange: 0, // Placeholder
+      eps: '0%', // Placeholder
+      mktCap: '0億', // Placeholder
+      insider: '無異動', // Placeholder
+      topic: '未定義', // Placeholder
+      lastUpdate: '05/19', // Placeholder
+      signals: [], // Placeholder
+      rules: [], // Placeholder
+      suggestion: '請查看詳細資訊' // Placeholder
+    }))
+  } catch (error) {
+    console.error('Failed to fetch stocks:', error)
+    // Fallback to mock data if API fails
+    stocks.value = [
+      // UP ZONE (Trading)
+      { symbol: '2330.TW', name: '台積電', price: 580.0, changePct: 2.5, zone: 'up', zoneLabel: '交易區', pe: 15.0, ma10: 560.0, ma30: 540.0, score: 95.5, volChange: -45, eps: '15%', mktCap: '1000億', insider: '增持', topic: '半導體', lastUpdate: '05/19', 
+        signals: [
+          { type: 'success', text: '收於10W均線之上' },
+          { type: 'success', text: '周量萎縮，浮籌清洗' },
+          { type: 'success', text: 'EPS增長 > 10%' }
+        ],
+        rules: [
+          { label: '神奇支撐', desc: '價格 580.0 > MA10 560.0，支撐有效', pass: true },
+          { label: '縮量確認', desc: '周量低於突破周 50%', pass: true },
+          { label: '估值安全', desc: 'PE 15.0 < 10，安全墊厚', pass: true },
+          { label: '內部資金', desc: '高管近30日增持', pass: true }
+        ],
+        suggestion: '縮量回踩10周均線確認，可分批建倉，嚴守550止損。'
+      },
+      { symbol: '2454.TW', name: '聯發科', price: 1200.0, changePct: 5.0, zone: 'up', zoneLabel: '交易區', pe: 20.0, ma10: 1150.0, ma30: 1100.0, score: 92.0, volChange: -60, eps: '22%', mktCap: '800億', insider: '無異動', topic: '半導體', lastUpdate: '05/19',
+        signals: [
+          { type: 'success', text: '站上30W均線' },
+          { type: 'success', text: '缺口未補' },
+          { type: 'warning', text: '媒體關注度上升' }
+        ],
+        rules: [
+          { label: '趨勢錨點', desc: 'MA30向上，角度45°', pass: true },
+          { label: '量價配合', desc: '缺口後縮量', pass: true },
+          { label: '風險點', desc: '留言板討論增多，需警惕', pass: false }
+        ],
+        suggestion: '形態標準，但注意媒體熱度，若放量滯漲需離場。'
+      },
+      // DOWN ZONE (Warning)
+      { symbol: '2880.TW', name: '國巨', price: 250.0, changePct: -3.0, zone: 'down', zoneLabel: '避雷區', pe: 18.0, ma10: 260.0, ma30: 270.0, score: 45.0, volChange: 350, eps: '-10%', mktCap: '300億', insider: '減持', topic: '電子零件', lastUpdate: '05/19',
+        signals: [
+          { type: 'warning', text: '跌破10W均線超15%' },
+          { type: 'warning', text: '高位放巨量陰線' },
+          { type: 'warning', text: '高管減持' }
+        ],
+        rules: [
+          { label: '生命線', desc: '價格 < MA10 260.0，破位嚴重', pass: false },
+          { label: '量價異常', desc: '周量激增，價格下跌', pass: false },
+          { label: '基本面惡化', desc: '業績不及預期', pass: false }
+        ],
+        suggestion: '鐵律觸發：跌破均線+放量+內部減持。堅決清倉，不可補倉！'
+      },
+      // POTENTIAL ZONE
+      { symbol: '2303.TW', name: '光寶科', price: 180.0, changePct: 1.5, zone: 'pot', zoneLabel: '驗證區', pe: 14.0, ma10: 175.0, ma30: 170.0, score: 88.0, volChange: 5, eps: '8%', mktCap: '250億', insider: '回購', topic: '電子零件', lastUpdate: '05/19',
+        signals: [
+          { type: 'info', text: '窄幅震盪 > 6個月' },
+          { type: 'info', text: '內部人士持續回購' },
+          { type: 'info', text: '等待放量突破' }
+        ],
+        rules: [
+          { label: '底部結構', desc: '長期橫盤，波幅收窄', pass: true },
+          { label: '籌碼結構', desc: '流通盤小，易撬動', pass: true },
+          { label: '啟動信號', desc: '尚未放量，需跟蹤', pass: false }
+        ],
+        suggestion: '列入觀察池。設置價格提醒：周量放大300%且站上MA30時通知。'
+      }
+    ]
+  } finally {
+    isStocksLoading.value = false
   }
-]
+}
 
-// 計算屬性：統計數據
-const stats = computed(() => ({
-  upZone: { title: '交易區 (上升趨勢)', value: 12, unit: '只', color: 'green', description: '符合「縮量回踩10周均線」條件' },
-  downZone: { title: '避雷區 (下跌警示)', value: 5, unit: '只', color: 'red', description: '跌破10周均線或放量滯漲' },
-  potZone: { title: '驗證區 (潛力跟蹤)', value: 28, unit: '只', color: 'blue', description: '長期窄底，等待放量啟動' },
-  winRate: { title: '本週勝率預估', value: 78, unit: '', color: 'gold', description: '基於歷史信號回測統計' }
-}))
+// Fetch statistics from API
+async function fetchStats() {
+  isStatsLoading.value = true
+  try {
+    // Get all stocks to calculate stats
+    const response = await fetch('http://localhost:8000/api/v1/screener/stocks/batch')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+    
+    // Calculate stats
+    const upCount = data.filter(stock => stock.zone === 'BUY').length
+    const downCount = data.filter(stock => stock.zone === 'SELL').length
+    const potCount = data.filter(stock => stock.zone === 'HOLD').length
+    
+    stats.value = {
+      upZone: { title: '交易區 (上升趨勢)', value: upCount, unit: '只', color: 'green', description: '符合「縮量回踩10周均線」條件' },
+      downZone: { title: '避雷區 (下跌警示)', value: downCount, unit: '只', color: 'red', description: '跌破10周均線或放量滯漲' },
+      potZone: { title: '驗證區 (潛力跟蹤)', value: potCount, unit: '只', color: 'blue', description: '長期窄底，等待放量啟動' },
+      winRate: { title: '本週勝率預估', value: 78, unit: '', color: 'gold', description: '基於歷史信號回測統計' }
+    }
+  } catch (error) {
+    console.error('Failed to fetch stats:', error)
+    // Fallback to mock stats
+    stats.value = {
+      upZone: { title: '交易區 (上升趨勢)', value: 12, unit: '只', color: 'green', description: '符合「縮量回踩10周均線」條件' },
+      downZone: { title: '避雷區 (下跌警示)', value: 5, unit: '只', color: 'red', description: '跌破10周均線或放量滯漲' },
+      potZone: { title: '驗證區 (潛力跟蹤)', value: 28, unit: '只', color: 'blue', description: '長期窄底，等待放量啟動' },
+      winRate: { title: '本週勝率預估', value: 78, unit: '', color: 'gold', description: '基於歷史信號回測統計' }
+    }
+  } finally {
+    isStatsLoading.value = false
+  }
+}
+
+// Fetch notifications (placeholder)
+async function fetchNotifications() {
+  notifications.value = [
+    { id: 1, type: 'sell', time: '16:05', title: 'XX科技 離場信號', desc: '連續兩周收於10W均線下方，且放量，建議清倉。' },
+    { id: 2, type: 'buy', time: '15:58', title: 'YY生醫 伏擊確認', desc: '縮量回踩10W均線，PE 6.5，符合買入條件。' },
+    { id: 3, type: 'info', time: '12:00', title: '週報生成完畢', desc: '本週共篩選出 12 只交易區標的，已發送至郵箱。' }
+  ]
+}
+
+// Initialize data on component mount
+onMounted(async () => {
+  await Promise.all([
+    fetchStocks(),
+    fetchStats(),
+    fetchNotifications()
+  ])
+})
 
 // 計算屬性：按區域篩選的股票
 const filteredStocks = computed(() => {
-  return stocks.filter(s => s.zone === activeTab.value)
+  return stocks.value.filter(s => s.zone === activeTab.value)
 })
 
 // Methods
@@ -137,7 +225,7 @@ function toggleNotifications() {
 }
 
 function markAllRead() {
-  notifications.splice(0, notifications.length)
+  notifications.value = []
 }
 
 function openStockDetail(stock) {
