@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.stock_detail import StockDetailResponse
 from app.indicators.ta_lib_calculator import TALibCalculator
 from app.engine.rule_engine import RuleEngine
-from classifier.zone_classifier import ThreeZoneClassifier
+from app.classifier.zone_classifier import ThreeZoneClassifier
 import pandas as pd
 import numpy as np
 

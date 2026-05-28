@@ -1,9 +1,72 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ambush System</title>
+    <title>一分鐘伏擊｜超級強勢股調研系統 V2.2</title>
+    
+    <!-- Fonts via Fontsource CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-400.css" type="text/css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-600.css" type="text/css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.0/latin-400.css" type="text/css" crossorigin="anonymous">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        trading: {
+                            dark: '#0b1120',
+                            panel: '#1e293b',
+                            border: '#334155',
+                            red: '#ef4444',
+                            redBg: '#450a0a',
+                            green: '#10b981',
+                            greenBg: '#064e3b',
+                            blue: '#3b82f6',
+                            blueBg: '#1e3a8a',
+                            gold: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Phosphor Icons (Clean SVG icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+        .alert-ring { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid #ef4444; animation: pulse-ring 2s infinite; }
+        
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #60a5fa; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #94a3b8; transition: all 0.2s; }
+        .tab-inactive:hover { color: #cbd5e1; border-color: #475569; }
+        
+        .stock-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .stock-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); border-color: #475569; }
+    </style>
 </head>
 <body>
     <div id="app"></div>

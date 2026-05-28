@@ -32,6 +32,7 @@ async function testApiConnection() {
 
 // Demo page data
 const activeMenu = ref('dashboard')
+const activeTab = ref('up')
 const showNotifications = ref(false)
 const unreadCount = ref(3)
 const selectedStock = ref(null)
@@ -45,6 +46,12 @@ const menuItems = [
   { id: 'settings', label: '系統設置', icon: 'ph-gear' }
 ]
 
+const tabs = [
+  { id: 'up', label: '⚡ 上升交易區' },
+  { id: 'down', label: '⚠️ 下跌避雷區' },
+  { id: 'pot', label: '🔍 潛力驗證區' }
+]
+
 const notifications = [
   { id: 1, type: 'sell', time: '16:05', title: 'XX科技 離場信號', desc: '連續兩周收於10W均線下方，且放量，建議清倉。' },
   { id: 2, type: 'buy', time: '15:58', title: 'YY生醫 伏擊確認', desc: '縮量回踩10W均線，PE 6.5，符合買入條件。' },
@@ -53,7 +60,7 @@ const notifications = [
 
 const stocks = [
   // UP ZONE (Trading)
-  { symbol: '603123', name: '翠微股份', price: 12.45, changePct: 1.2, zone: 'up', zoneLabel: '交易區', pe: 8.2, ma10: 11.8, ma30: 10.5, score: 8.5, volChange: -45, eps: '15%', mktCap: '32億', insider: '增持', topic: '新零售', lastUpdate: '05/19', 
+  { symbol: '603123', name: '翠微股份1', price: 12.45, changePct: 1.2, zone: 'up', zoneLabel: '交易區', pe: 8.2, ma10: 11.8, ma30: 10.5, score: 8.5, volChange: -45, eps: '15%', mktCap: '32億', insider: '增持', topic: '新零售', lastUpdate: '05/19', 
     signals: [
       { type: 'success', text: '收於10W均線之上' },
       { type: 'success', text: '周量萎縮，浮籌清洗' },
@@ -67,7 +74,7 @@ const stocks = [
     ],
     suggestion: '縮量回踩10周均線確認，可分批建倉，嚴守11.0止損。'
   },
-  { symbol: '00258', name: '綠心集團', price: 14.20, changePct: 0.5, zone: 'up', zoneLabel: '交易區', pe: 9.1, ma10: 13.5, ma30: 12.8, score: 7.8, volChange: -60, eps: '22%', mktCap: '45億', insider: '無異動', topic: '環保', lastUpdate: '05/19',
+  { symbol: '00258', name: '綠心2集團', price: 14.20, changePct: 0.5, zone: 'up', zoneLabel: '交易區', pe: 9.1, ma10: 13.5, ma30: 12.8, score: 7.8, volChange: -60, eps: '22%', mktCap: '45億', insider: '無異動', topic: '環保', lastUpdate: '05/19',
     signals: [
       { type: 'success', text: '站上30W均線' },
       { type: 'success', text: '缺口未補' },
@@ -112,19 +119,16 @@ const stocks = [
 
 // 計算屬性：統計數據
 const stats = computed(() => ({
-  upZone: { title: '交易區 (上升趨勢)', value: 12, change: 0, color: 'green', description: '符合「縮量回踩10周均線」條件' },
-  downZone: { title: '避雷區 (下跌警示)', value: 5, change: 0, color: 'red', description: '跌破10周均線或放量滯漲' },
-  potZone: { title: '驗證區 (潛力跟蹤)', value: 28, change: 0, color: 'blue', description: '長期窄底，等待放量啟動' },
-  winRate: { title: '本週勝率預估', value: 78, change: 2, color: 'gold', description: '基於歷史信號回測統計' }
+  upZone: { title: '交易區 (上升趨勢)', value: 12, unit: '只', color: 'green', description: '符合「縮量回踩10周均線」條件' },
+  downZone: { title: '避雷區 (下跌警示)', value: 5, unit: '只', color: 'red', description: '跌破10周均線或放量滯漲' },
+  potZone: { title: '驗證區 (潛力跟蹤)', value: 28, unit: '只', color: 'blue', description: '長期窄底，等待放量啟動' },
+  winRate: { title: '本週勝率預估', value: 78, unit: '', color: 'gold', description: '基於歷史信號回測統計' }
 }))
 
-// 計算屬性：按區域分組的股票
-const stocksByZone = computed(() => ({
-  up: stocks.filter(s => s.zone === 'up'),
-  down: stocks.filter(s => s.zone === 'down'),
-  pot: stocks.filter(s => s.zone === 'pot')
-}))
-
+// 計算屬性：按區域篩選的股票
+const filteredStocks = computed(() => {
+  return stocks.filter(s => s.zone === activeTab.value)
+})
 
 // Methods
 function toggleNotifications() {
@@ -139,12 +143,113 @@ function markAllRead() {
 function openStockDetail(stock) {
   selectedStock.value = stock
   chartInitialized.value = false
-  // In a real app, we would initialize the chart here
+  // Wait for DOM update then init chart
+  setTimeout(() => {
+    initChart(stock)
+  }, 100)
 }
 
 function closeModal() {
   selectedStock.value = null
   chartInitialized.value = false
+}
+
+function initChart(stock) {
+  const canvas = document.getElementById('stockChart')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  
+  // Mock Weekly Data generation
+  const labels = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12']
+  let priceData = []
+  let ma10Data = []
+  let ma30Data = []
+  
+  let p = stock.price * 0.8
+  for (let i = 0; i < 12; i++) {
+    p = p + (Math.random() - 0.45) * (stock.price * 0.05)
+    priceData.push(p)
+  }
+  priceData[11] = stock.price
+  
+  for (let i = 0; i < 12; i++) {
+    let base = stock.zone === 'up' ? stock.price * 0.95 : stock.price * 1.1
+    ma10Data.push(base + Math.random() * 0.5)
+    
+    let base30 = stock.zone === 'up' ? stock.price * 0.85 : stock.price * 1.3
+    ma30Data.push(base30 + Math.random() * 0.5)
+  }
+
+  // Destroy existing chart if any
+  if (window.currentChart) window.currentChart.destroy()
+
+  window.currentChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '周收盤價',
+          data: priceData,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: true
+        },
+        {
+          label: '10周均線 (神奇支撐)',
+          data: ma10Data,
+          borderColor: '#f59e0b',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0.3
+        },
+        {
+          label: '30周均線 (趨勢錨點)',
+          data: ma30Data,
+          borderColor: '#64748b',
+          borderWidth: 1,
+          pointRadius: 0,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(30, 41, 59, 0.9)',
+          titleColor: '#94a3b8',
+          bodyFont: { family: "'JetBrains Mono'" }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#334155', drawBorder: false },
+          ticks: { color: '#94a3b8', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: '#334155', drawBorder: false },
+          ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => v.toFixed(2) }
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
+      }
+    }
+  })
+  chartInitialized.value = true
 }
 </script>
 
@@ -231,52 +336,75 @@ function closeModal() {
           <StatCard 
             :title="stats.upZone.title" 
             :value="stats.upZone.value" 
-            :change="stats.upZone.change"
-            color="green"
+            :unit="stats.upZone.unit"
+            :color="stats.upZone.color"
+            :description="stats.upZone.description"
           />
           <StatCard 
             :title="stats.downZone.title" 
             :value="stats.downZone.value" 
-            :change="stats.downZone.change"
-            color="red"
+            :unit="stats.downZone.unit"
+            :color="stats.downZone.color"
+            :description="stats.downZone.description"
           />
           <StatCard 
             :title="stats.potZone.title" 
             :value="stats.potZone.value" 
-            :change="stats.potZone.change"
-            color="blue"
+            :unit="stats.potZone.unit"
+            :color="stats.potZone.color"
+            :description="stats.potZone.description"
           />
           <StatCard 
             :title="stats.winRate.title" 
             :value="stats.winRate.value" 
-            :change="stats.winRate.change"
-            color="gold"
+            :unit="stats.winRate.unit"
+            :color="stats.winRate.color"
+            :description="stats.winRate.description"
           />
         </div>
 
+        <!-- Tabs -->
+        <div class="flex gap-6 border-b border-trading-border mb-4 text-xs font-medium">
+          <button v-for="tab in tabs" :key="tab.id" 
+            class="pb-2 px-1" 
+            :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
+            @click="activeTab = tab.id">
+            <span :class="{'text-green-400': tab.id === 'up', 'text-red-400': tab.id === 'down', 'text-blue-400': tab.id === 'pot'}">{{ tab.label }}</span>
+          </button>
+        </div>
 
-        <!-- Stock List with Zone Panels -->
+        <!-- Filters (Conditional) -->
+        <div v-if="activeTab === 'up'" class="flex gap-2 mb-4 flex-wrap items-center">
+          <span class="text-xs text-slate-500 mr-2">篩選條件:</span>
+          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+            <input type="checkbox" class="accent-blue-500" checked> PE < 10
+          </label>
+          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+            <input type="checkbox" class="accent-blue-500" checked> 股價 < 15
+          </label>
+          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+            <input type="checkbox" class="accent-blue-500" checked> 內部增持
+          </label>
+          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+            <input type="checkbox" class="accent-blue-500"> 流通盤 < 800萬
+          </label>
+        </div>
+
+        <!-- Stock List with Zone Panels (Tab based) -->
         <div class="space-y-6 mb-6">
-          <!-- Up Zone Panel -->
           <ZonePanel 
-            zone="up"
-            title="⚡ 上升交易區"
-            :stocks="stocksByZone.up"
+            :zone="activeTab"
+            :title="tabs.find(t => t.id === activeTab).label"
+            :stocks="filteredStocks"
           />
-          
-          <!-- Down Zone Panel -->
-          <ZonePanel 
-            zone="down"
-            title="⚠️ 下跌避雷區"
-            :stocks="stocksByZone.down"
-          />
-          
-          <!-- Potential Zone Panel -->
-          <ZonePanel 
-            zone="pot"
-            title="🔍 潛力驗證區"
-            :stocks="stocksByZone.pot"
-          />
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredStocks.length === 0" class="text-center py-20">
+          <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
+            <i class="ph-bold ph-magnifying-glass text-2xl"></i>
+          </div>
+          <p class="text-slate-500">當前板塊無符合條件標的</p>
         </div>
 
       </div>
@@ -308,8 +436,8 @@ function closeModal() {
                 <i class="ph-bold ph-chart-line-up text-blue-400"></i> 周K線趨勢圖
               </h3>
               <div class="relative h-64 bg-slate-900 rounded border border-slate-700 flex items-center justify-center overflow-hidden">
-                <!-- Mock Chart Canvas -->
-                <div class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
+                <canvas id="stockChart" width="600" height="250"></canvas>
+                <div v-if="!chartInitialized" class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
                   <div class="flex flex-col items-center gap-2">
                     <i class="ph-bold ph-spinner gap-4 text-blue-500 text-2xl animate-spin"></i>
                     <span class="text-xs text-slate-400">正在加載周線數據...</span>
@@ -405,21 +533,10 @@ function closeModal() {
       </div>
     </div>
   </div>
-    <router-view />
+  <router-view />
 </template>
 
 <style scoped>
-/* Import the necessary styles from the demo */
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-400.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5.0.0/latin-600-normal.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.0/latin-400.css');
-
-body { 
-  font-family: 'Noto Sans TC', sans-serif; 
-  background-color: #0f172a; 
-  color: #e2e8f0; 
-}
-
 .mono { 
   font-family: 'JetBrains Mono', monospace; 
 }
@@ -453,16 +570,10 @@ body {
   animation: pulse-ring 2s infinite; 
 }
 
+.tab-active { border-bottom: 2px solid #3b82f6; color: #60a5fa; }
+.tab-inactive { border-bottom: 2px solid transparent; color: #94a3b8; transition: all 0.2s; }
+.tab-inactive:hover { color: #cbd5e1; border-color: #475569; }
 
-/* Trading colors */
-.trading-dark { background-color: #0b1120; }
-.trading-panel { background-color: #1e293b; }
-.trading-border { border-color: #334155; }
-.trading-red { color: #ef4444; }
-.trading-red-bg { background-color: #450a0a; }
-.trading-green { color: #10b981; }
-.trading-green-bg { background-color: #064e3b; }
-.trading-blue { color: #3b82f6; }
-.trading-blue-bg { background-color: #1e3a8a; }
-.trading-gold { color: #f59e0b; }
+.stock-card { transition: transform 0.2s, box-shadow 0.2s; }
+.stock-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); border-color: #475569; }
 </style>
