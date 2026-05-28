@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/v1/stocks", tags=["stock_detail"])
 
 # 模擬股票數據（實際應用中應該從數據庫或緩存獲取）
 mock_stocks = [
-    {"symbol": "2330.TW", "name": "台積電", "price": 580.0, "change_pct": 2.5, "volume": 1000000, "market_cap": 1000000000000, "pe_ratio": 15.0},
+    {"symbol": "2330.TW", "name": "台積電4", "price": 580.0, "change_pct": 2.5, "volume": 1000000, "market_cap": 1000000000000, "pe_ratio": 15.0},
     {"symbol": "2317.TW", "name": "鴻海", "price": 85.0, "change_pct": -1.2, "volume": 800000, "market_cap": 500000000000, "pe_ratio": 12.0},
     {"symbol": "2454.TW", "name": "聯發科", "price": 1200.0, "change_pct": 5.0, "volume": 1200000, "market_cap": 800000000000, "pe_ratio": 20.0},
     {"symbol": "1301.TW", "name": "台塑", "price": 110.0, "change_pct": 0.8, "volume": 900000, "market_cap": 400000000000, "pe_ratio": 10.0},

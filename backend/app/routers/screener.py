@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/v1/screener", tags=["screener"])
 mock_stocks = [
     StockItem(
         symbol="2330.TW",
-        name="台積電",
+        name="台積電3",
         price=580.0,
         change_pct=2.5,
         zone=ZoneType.BUY,

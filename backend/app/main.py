@@ -15,7 +15,7 @@ app = FastAPI(
 # CORS 配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vue3 開發服務器
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vue3 開發服務器和前端容器
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
