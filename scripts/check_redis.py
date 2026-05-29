@@ -53,7 +53,7 @@ if "--docker" in sys.argv:
 else:
     # 本機環境使用個別變數
     r = redis.Redis(
-        host=os.getenv("REDIS_HOST", "localhost"),
+        host=os.getenv("REDIS_HOST", "redis"),
         port=int(os.getenv("REDIS_PORT", 6379)),
         decode_responses=True,
     )
