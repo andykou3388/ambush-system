@@ -11,8 +11,16 @@ load_dotenv()
 
 def create_test_table():
     """建立測試表格"""
+    # 在 Docker 容器內，優先使用 DATABASE_URL 解析主機
+    db_url = os.getenv("DATABASE_URL")
+    if db_url and "db:" in db_url:
+        # 在 Docker 環境中，使用 db 容器主機名稱
+        host = "db"
+    else:
+        host = os.getenv("DB_HOST", "localhost")
+    
     conn = psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
+        host=host,
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "ambush_dev"),
         user=os.getenv("DB_USER", "dev_user"),
