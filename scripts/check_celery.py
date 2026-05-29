@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/..')
 try:
     # 導入 Celery 應用和任務
     from app.celery_app import celery_app
-    from app.tasks import run_weekly_analysis
+    from app.service_task import run_weekly_analysis
     
     def test_celery_connection():
         """測試 Celery 連接"""

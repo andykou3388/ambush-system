@@ -5,6 +5,7 @@
 from celery import shared_task
 from celery.utils.log import get_task_logger
 import logging
+from .tasks_helper import get_stock_list, calculate_indicators, run_rule_engine, classify_stock, generate_report
 
 logger = get_task_logger(__name__)
 
@@ -50,44 +51,3 @@ def run_weekly_analysis(self, market='TW'):
     except Exception as exc:
         logger.error(f"❌ 分析失敗: {exc}")
         raise self.retry(exc=exc)
-
-def get_stock_list(market):
-    """獲取指定市場的股票列表"""
-    # 從數據庫或 API 獲取股票列表
-    # 依據執行計劃文件，需要與數據收集任務協調
-    if market == 'TW':
-        return ['2330.TW', '2317.TW', '2454.TW']
-    else:
-        return ['AAPL', 'MSFT', 'GOOGL']
-
-def calculate_indicators(symbol):
-    """計算技術指標"""
-    # 調用 CORE-01 的技術指標計算模組
-    # 依據執行計劃文件，需要與數據收集任務協調
-    logger.info(f"  計算 {symbol} 的技術指標")
-    # 這裡應該調用實際的技術指標計算函數
-    pass
-
-def run_rule_engine(symbol):
-    """執行規則引擎"""
-    # 調用 CORE-02 的規則引擎
-    # 依據執行計劃文件，需要與數據收集任務協調
-    logger.info(f"  執行 {symbol} 的規則引擎")
-    # 這裡應該調用實際的規則引擎函數
-    pass
-
-def classify_stock(symbol):
-    """執行三區分類"""
-    # 調用 CORE-03 的三區分類器
-    # 依據執行計劃文件，需要與數據收集任務協調
-    logger.info(f"  對 {symbol} 執行三區分類")
-    # 這裡應該調用實際的三區分類函數
-    return {"symbol": symbol, "classification": "unknown"}
-
-def generate_report(results, market):
-    """生成分析報告"""
-    # 生成報告並存儲
-    # 依據執行計劃文件，需要與數據收集任務協調
-    logger.info(f"  生成 {market} 市場的分析報告，共 {len(results)} 隻股票")
-    # 這裡應該實現報告生成邏輯
-    pass
