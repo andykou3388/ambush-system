@@ -24,6 +24,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - DEBUG=${DEBUG:-true}
+      - DB_HOST=db
     volumes:
       - ./backend/app:/app/app
       - ./backend/indicators:/app/app/indicators
@@ -114,6 +115,8 @@ services:
       - DEBUG=${DEBUG:-true}
     volumes:
       - ./backend/app:/app/app
+      - ./backend/engine:/app/app/engine
+      - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
     command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h

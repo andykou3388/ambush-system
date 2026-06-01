@@ -1,8 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.routers import health
 from app.routers.screener import router as screener_router
 from app.routers.stock_detail import router as stock_detail_router
+from app.database import check_db_connection
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """應用生命週期管理"""
+    # 啟動時檢查資料庫連線
+    if check_db_connection():
+        print("✅ 資料庫連線正常")
+    else:
+        print("⚠️ 資料庫連線失敗，請確認容器已啟動")
+    yield
+    # 關閉時清理（如有需要）
+
 
 app = FastAPI(
     title="Ambush System API",
@@ -10,6 +25,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS 配置

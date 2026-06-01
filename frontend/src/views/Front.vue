@@ -75,28 +75,31 @@ async function fetchStocks() {
     }
     const data = await response.json()
     
-    // Map API response (zone: "buy"/"hold"/"sell") to frontend format (zone: "up"/"down"/"pot")
-    const zoneMap = { buy: 'up', hold: 'pot', sell: 'down' }
-    const zoneLabelMap = { buy: '交易區', hold: '驗證區', sell: '避雷區' }
+    // Map API response (zone: "UPTREND"/"POTENTIAL"/"DOWNTREND") to frontend format (zone: "up"/"down"/"pot")
+    const zoneMap = { 'UPTREND': 'up', 'POTENTIAL': 'pot', 'DOWNTREND': 'down' }
+    const zoneLabelMap = { 'UPTREND': '交易區', 'POTENTIAL': '驗證區', 'DOWNTREND': '避雷區' }
     stocks.value = data.map(stock => {
-      const zoneKey = (stock.zone || '').toLowerCase()
+      const zoneKey = (stock.zone || '').toUpperCase()
       return {
-        ...stock,
-        zone: zoneMap[zoneKey] || zoneKey,
-        zoneLabel: zoneLabelMap[zoneKey] || '未知',
-        pe: stock.score,
+        symbol: stock.symbol,
+        name: stock.name,
+        price: stock.price,
+        changePct: stock.changePct,
+        zone: zoneMap[zoneKey] || 'pot',
+        zoneLabel: zoneLabelMap[zoneKey] || '驗證區',
         ma10: stock.ma10,
         ma30: stock.ma30,
         score: stock.score,
-        volChange: 0,
-        eps: '0%',
-        mktCap: '0億',
-        insider: '無異動',
-        topic: '未定義',
-        lastUpdate: '05/19',
-        signals: [],
-        rules: [],
-        suggestion: '請查看詳細資訊'
+        pe: stock.score,
+        volChange: stock.volChange || 0,
+        eps: stock.eps || '0%',
+        mktCap: stock.mktCap || '0億',
+        insider: stock.insider || '無異動',
+        topic: stock.topic || '未定義',
+        lastUpdate: stock.lastUpdate || '',
+        signals: stock.signals || [],
+        rules: stock.rules || [],
+        suggestion: stock.suggestion || '請查看詳細資訊'
       }
     })
   } catch (error) {
