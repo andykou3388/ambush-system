@@ -74,20 +74,29 @@ def calculate_indicators(symbol: str) -> Dict[str, Any]:
         closes = [float(b.close) for b in bars if b.close]
         volumes = [b.volume or 0 for b in bars]
 
+        # 確保至少有1筆資料
+        if not closes:
+            logger.warning(f"{symbol} 無收盤價數據")
+            return {"symbol": symbol, "status": "no_data"}
+
+        ma10 = 0
+        ma30 = 0
+        vol_ma5 = 0
+
         if len(closes) >= 10:
             ma10 = sum(closes[:10]) / 10
         else:
-            ma10 = closes[0] if closes else 0
+            ma10 = closes[-1]  # 使用最後一筆
 
         if len(closes) >= 30:
             ma30 = sum(closes[:30]) / 30
         else:
-            ma30 = closes[0] if closes else 0
+            ma30 = closes[-1]  # 使用最後一筆
 
         if len(volumes) >= 5:
             vol_ma5 = sum(volumes[:5]) / 5
         else:
-            vol_ma5 = volumes[0] if volumes else 0
+            vol_ma5 = volumes[-1] if volumes else 0  # 使用最後一筆
 
         # 更新最新一筆的 MA 值
         latest_bar = bars[0]

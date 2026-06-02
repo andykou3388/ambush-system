@@ -21,7 +21,13 @@ class Rule5Fundamental:
         """
         fund_cfg = self.cfg
 
-        cond1 = row.get("debt_ratio", 1) < fund_cfg["low_debt_ratio"]
+        # 處理 debt_ratio 為 None 的情況
+        debt_ratio = row.get("debt_ratio")
+        if debt_ratio is None:
+            cond1 = True  # 如果沒有負債比數據，視為符合條件
+        else:
+            cond1 = debt_ratio < fund_cfg["low_debt_ratio"]
+            
         cond2 = row.get("insider_buy", 0) == 1
         cond3 = row.get("analyst_cover", 1) == 0
 

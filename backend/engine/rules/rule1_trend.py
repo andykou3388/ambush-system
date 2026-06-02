@@ -22,6 +22,22 @@ class Rule1Trend:
         close = row.get("close", 0)
         ma10 = row.get("ma10", 0)
         ma30 = row.get("ma30", 0)
+        
+        # 處理 None 值和非數值類型
+        if close is None:
+            close = 0
+        else:
+            close = float(close)
+            
+        if ma10 is None:
+            ma10 = 0
+        else:
+            ma10 = float(ma10)
+            
+        if ma30 is None:
+            ma30 = 0
+        else:
+            ma30 = float(ma30)
 
         return {
             "long": close > ma10,
