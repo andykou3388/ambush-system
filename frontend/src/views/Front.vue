@@ -52,6 +52,7 @@ const isStatsLoading = ref(false)
 
 const menuItems = [
   { id: 'dashboard', label: '實盤看板', icon: 'ph-squares-four' },
+  { id: 'stockpool', label: '篩選器', icon: 'ph-funnel' },
   { id: 'screen', label: '智能篩選', icon: 'ph-funnel' },
   { id: 'alerts', label: '信號預警', icon: 'ph-bell-ringing' },
   { id: 'logs', label: '風控日誌', icon: 'ph-scroll' },
@@ -320,12 +321,13 @@ function initChart(stock) {
       </div>
 
       <nav class="flex-1 py-4 space-y-1 px-2">
-        <a v-for="item in menuItems" :key="item.id" href="#" 
+        <router-link v-for="item in menuItems" :key="item.id" 
+           :to="item.id === 'dashboard' ? '/' : `/${item.id}`"
            class="flex items-center gap-3 px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-trading-panel transition-colors group"
            :class="{'bg-trading-panel text-white': activeMenu === item.id}">
           <i :class="['ph-bold', item.icon, 'text-lg', 'group-hover:text-blue-400']"></i>
           <span class="hidden lg:block text-xs font-medium">{{ item.label }}</span>
-        </a>
+        </router-link>
       </nav>
 
       <div class="p-4 border-t border-trading-border">

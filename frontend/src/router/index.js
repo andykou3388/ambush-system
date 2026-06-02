@@ -3,6 +3,7 @@ import Front from '../views/Front.vue'
 import Dashboard from '../views/Dashboard.vue'
 import CardDemo from '../views/CardDemo.vue'
 import StockDetail from '../views/StockDetail.vue'
+import StockPool from '../views/StockPool.vue'
 
 const routes = [
   {
@@ -25,6 +26,11 @@ const routes = [
     path: '/stocks/:symbol',
     name: 'StockDetail',
     component: StockDetail
+  },
+  {
+    path: '/stockpool',
+    name: 'StockPool',
+    component: StockPool
   }
 ]
 

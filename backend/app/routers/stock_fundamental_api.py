@@ -5,6 +5,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from pydantic import BaseModel
+from app.database import SessionLocal
+from app.models.stock_fundamental import StockFundamental
 from app.tasks.stock_fundamental_tasks import (
     fetch_stock_fundamentals,
     fetch_single_stock_fundamental,
@@ -76,6 +78,35 @@ async def fetch_single_fundamental(symbol: str):
         message=f"已啟動 {symbol} 數據獲取任務",
         task_id=task.id,
     )
+
+
+@router.get("/list")
+async def list_fundamentals():
+    """
+    獲取所有股票基本面數據
+    
+    Returns:
+        list: 所有股票的基本面數據列表
+    """
+    db = SessionLocal()
+    try:
+        stocks = db.query(StockFundamental).order_by(StockFundamental.code).all()
+        return [
+            {
+                "id": s.id,
+                "code": s.code,
+                "market": s.market,
+                "report_date": str(s.report_date) if s.report_date else None,
+                "pe_ttm": float(s.pe_ttm) if s.pe_ttm else None,
+                "eps_ttm": float(s.eps_ttm) if s.eps_ttm else None,
+                "float_shares": s.float_shares,
+                "debt_ratio": float(s.debt_ratio) if s.debt_ratio else None,
+                "updated_at": str(s.updated_at) if s.updated_at else None,
+            }
+            for s in stocks
+        ]
+    finally:
+        db.close()
 
 
 @router.get("/status/{task_id}", response_model=TaskStatusResponse)
