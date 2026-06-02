@@ -54,7 +54,9 @@ def calculate_indicators(symbol: str) -> Dict[str, Any]:
     Returns:
         技術指標數據
     """
+    
     logger.info(f"計算 {symbol} 的技術指標")
+    print(f"計算 {symbol} 的技術指標")
     db = SessionLocal()
     try:
         # 讀取最近 60 筆週線數據

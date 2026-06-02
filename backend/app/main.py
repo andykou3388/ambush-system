@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from app.routers import health
 from app.routers.screener import router as screener_router
 from app.routers.stock_detail import router as stock_detail_router
+from app.routers.stock_fundamental_api import router as stock_fundamental_router
 from app.database import check_db_connection
 
 
@@ -41,3 +42,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(screener_router)
 app.include_router(stock_detail_router)
+app.include_router(stock_fundamental_router)

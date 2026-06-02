@@ -10,7 +10,11 @@ celery_app = Celery(
     "ambush_system",
     broker=redis_url,
     backend=redis_url,  # 使用 Redis 作為結果後端
-    include=['app.tasks.example_task', 'app.service_task']  # 包含任務模組
+    include=[
+        'app.tasks.example_task',
+        'app.tasks.stock_fundamental_tasks',
+        'app.service_task',
+    ]  # 包含任務模組
 )
 
 # 配置 Celery
