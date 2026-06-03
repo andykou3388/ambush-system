@@ -1,6 +1,5 @@
 <template>
-  <div class="min-h-screen p-6 max-w-[1600px] mx-auto">
-    
+  <Layout>
     <!-- 頂部標題列 -->
     <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
       <div class="flex items-center gap-4">
@@ -343,12 +342,12 @@
         </div>
       </div>
     </transition>
-
-  </div>
+  </Layout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import Layout from '@/components/Layout.vue'
 
 // 股票數據
 const stocks = ref([])

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import Layout from '@/components/Layout.vue'
 import StatCard from '@/components/StatCard.vue'
 import ZonePanel from '@/components/ZonePanel.vue'
 
@@ -31,10 +32,7 @@ async function testApiConnection() {
 }
 
 // Data states
-const activeMenu = ref('dashboard')
 const activeTab = ref('up')
-const showNotifications = ref(false)
-const unreadCount = ref(3)
 const selectedStock = ref(null)
 const chartInitialized = ref(false)
 const stocks = ref([])
@@ -44,7 +42,6 @@ const stats = ref({
   potZone: { title: '驗證區 (潛力跟蹤)', value: 0, unit: '只', color: 'blue', description: '' },
   winRate: { title: '本週勝率預估', value: 0, unit: '', color: 'gold', description: '' }
 })
-const notifications = ref([])
 
 // Loading states
 const isStocksLoading = ref(false)
@@ -52,7 +49,6 @@ const isStatsLoading = ref(false)
 
 const menuItems = [
   { id: 'dashboard', label: '實盤看板', icon: 'ph-squares-four' },
-  { id: 'stockpool', label: '篩選器', icon: 'ph-funnel' },
   { id: 'screen', label: '智能篩選', icon: 'ph-funnel' },
   { id: 'alerts', label: '信號預警', icon: 'ph-bell-ringing' },
   { id: 'logs', label: '風控日誌', icon: 'ph-scroll' },
@@ -163,21 +159,11 @@ async function fetchStats() {
   }
 }
 
-// Fetch notifications (placeholder)
-async function fetchNotifications() {
-  notifications.value = [
-    { id: 1, type: 'sell', time: '16:05', title: 'XX科技 離場信號', desc: '連續兩周收於10W均線下方，且放量，建議清倉。' },
-    { id: 2, type: 'buy', time: '15:58', title: 'YY生醫 伏擊確認', desc: '縮量回踩10W均線，PE 6.5，符合買入條件。' },
-    { id: 3, type: 'info', time: '12:00', title: '週報生成完畢', desc: '本週共篩選出 12 只交易區標的，已發送至郵箱。' }
-  ]
-}
-
 // Initialize data on component mount
 onMounted(async () => {
   await Promise.all([
     fetchStocks(),
-    fetchStats(),
-    fetchNotifications()
+    fetchStats()
   ])
 })
 
@@ -187,15 +173,6 @@ const filteredStocks = computed(() => {
 })
 
 // Methods
-function toggleNotifications() {
-  showNotifications.value = !showNotifications.value
-  if (showNotifications.value) unreadCount.value = 0
-}
-
-function markAllRead() {
-  notifications.value = []
-}
-
 function openStockDetail(stock) {
   selectedStock.value = stock
   chartInitialized.value = false
@@ -310,287 +287,206 @@ function initChart(stock) {
 </script>
 
 <template>
-  <div class="h-screen flex overflow-hidden text-sm bg-slate-900">
-    <!-- Sidebar -->
-    <aside class="w-16 lg:w-64 flex-shrink-0 bg-trading-dark border-r border-trading-border flex flex-col transition-all duration-300">
-      <div class="h-14 flex items-center justify-center lg:justify-start lg:px-4 border-b border-trading-border">
-        <div class="flex items-center gap-2 font-bold text-lg tracking-wider text-trading-green">
-          <i class="ph-bold ph-trend-up text-xl"></i>
-          <span class="hidden lg:block">伏擊系統</span>
-        </div>
+  <Layout>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <StatCard 
+        :title="stats.upZone.title" 
+        :value="stats.upZone.value" 
+        :unit="stats.upZone.unit"
+        :color="stats.upZone.color"
+        :description="stats.upZone.description"
+      />
+      <StatCard 
+        :title="stats.downZone.title" 
+        :value="stats.downZone.value" 
+        :unit="stats.downZone.unit"
+        :color="stats.downZone.color"
+        :description="stats.downZone.description"
+      />
+      <StatCard 
+        :title="stats.potZone.title" 
+        :value="stats.potZone.value" 
+        :unit="stats.potZone.unit"
+        :color="stats.potZone.color"
+        :description="stats.potZone.description"
+      />
+      <StatCard 
+        :title="stats.winRate.title" 
+        :value="stats.winRate.value" 
+        :unit="stats.winRate.unit"
+        :color="stats.winRate.color"
+        :description="stats.winRate.description"
+      />
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-6 border-b border-trading-border mb-4 text-xs font-medium">
+      <button v-for="tab in tabs" :key="tab.id" 
+        class="pb-2 px-1" 
+        :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
+        @click="activeTab = tab.id">
+        <span :class="{'text-green-400': tab.id === 'up', 'text-red-400': tab.id === 'down', 'text-blue-400': tab.id === 'pot'}">{{ tab.label }}</span>
+      </button>
+    </div>
+
+    <!-- Filters (Conditional) -->
+    <div v-if="activeTab === 'up'" class="flex gap-2 mb-4 flex-wrap items-center">
+      <span class="text-xs text-slate-500 mr-2">篩選條件:</span>
+      <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+        <input type="checkbox" class="accent-blue-500" checked> PE < 10
+      </label>
+      <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+        <input type="checkbox" class="accent-blue-500" checked> 股價 < 15
+      </label>
+      <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+        <input type="checkbox" class="accent-blue-500" checked> 內部增持
+      </label>
+      <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
+        <input type="checkbox" class="accent-blue-500"> 流通盤 < 800萬
+      </label>
+    </div>
+
+    <!-- Stock List with Zone Panels (Tab based) -->
+    <div class="space-y-6 mb-6">
+      <ZonePanel 
+        :zone="activeTab"
+        :title="tabs.find(t => t.id === activeTab).label"
+        :stocks="filteredStocks"
+      />
+    </div>
+
+    <!-- Empty State -->
+    <div v-if="filteredStocks.length === 0" class="text-center py-20">
+      <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
+        <i class="ph-bold ph-magnifying-glass text-2xl"></i>
       </div>
+      <p class="text-slate-500">當前板塊無符合條件標的</p>
+    </div>
+  </Layout>
 
-      <nav class="flex-1 py-4 space-y-1 px-2">
-        <router-link v-for="item in menuItems" :key="item.id" 
-           :to="item.id === 'dashboard' ? '/' : `/${item.id}`"
-           class="flex items-center gap-3 px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-trading-panel transition-colors group"
-           :class="{'bg-trading-panel text-white': activeMenu === item.id}">
-          <i :class="['ph-bold', item.icon, 'text-lg', 'group-hover:text-blue-400']"></i>
-          <span class="hidden lg:block text-xs font-medium">{{ item.label }}</span>
-        </router-link>
-      </nav>
-
-      <div class="p-4 border-t border-trading-border">
+  <!-- Stock Detail Modal -->
+  <div v-if="selectedStock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="closeModal">
+    <div class="bg-slate-900 w-full max-w-4xl h-[90vh] rounded-xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-            交
-          </div>
-          <div class="hidden lg:block overflow-hidden">
-            <p class="text-xs font-medium text-white truncate">波段交易員 01</p>
-            <p class="text-[10px] text-slate-400">權限：全權限</p>
-          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold text-white" :class="selectedStock.zone === 'up' ? 'bg-green-600' : selectedStock.zone === 'down' ? 'bg-red-600' : 'bg-blue-600'">
+            {{ selectedStock.zoneLabel }}
+          </span>
+          <h2 class="text-xl font-bold mono text-white">{{ selectedStock.symbol }} <span class="text-sm text-slate-400 font-sans ml-2">{{ selectedStock.name }}</span></h2>
         </div>
-      </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col min-w-0 bg-slate-900">
-      <!-- Header -->
-      <header class="h-14 bg-trading-dark border-b border-trading-border flex items-center justify-between px-6 shadow-md z-10">
-        <h1 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-trading-green animate-pulse"></span>
-          實盤監控看板 <span class="text-xs text-slate-500 font-normal mono">2026-05-19 週五 16:00 UTC+8</span>
-        </h1>
-
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2 px-3 py-1 rounded bg-slate-800 border border-trading-border text-xs">
-            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-            <span class="text-slate-400">數據源：</span>
-            <span class="text-white font-mono">AKShare / Polygon</span>
-          </div>
-
-          <button @click="toggleNotifications" class="relative p-2 text-slate-400 hover:text-white transition-colors">
-            <i class="ph-bold ph-bell text-lg"></i>
-            <span v-if="unreadCount > 0" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-        </div>
-      </header>
-
-      <!-- Notification Panel (Slide Over) -->
-      <div v-if="showNotifications" class="absolute top-14 right-0 w-80 bg-trading-dark border border-trading-border shadow-2xl z-50 rounded-bl-lg overflow-hidden transition-all">
-        <div class="p-3 bg-slate-800 flex justify-between items-center border-b border-trading-border">
-          <span class="font-semibold text-xs">即時信號通知</span>
-          <button @click="markAllRead" class="text-[10px] text-blue-400 hover:text-blue-300">全部已讀</button>
-        </div>
-        <div class="h-64 overflow-y-auto divide-y divide-trading-border bg-slate-900/50">
-          <div v-for="n in notifications" :key="n.id" class="p-3 hover:bg-slate-800 transition-colors group">
-            <div class="flex justify-between items-start mb-1">
-              <span class="text-[10px] mono text-slate-500">{{ n.time }}</span>
-              <span :class="{'bg-red-900 text-red-300': n.type==='sell', 'bg-green-900 text-green-300': n.type==='buy', 'bg-blue-900 text-blue-300': n.type==='info'}" class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">{{ n.type === 'sell' ? '⚠️ 賣出' : n.type === 'buy' ? '✅ 買點' : 'ℹ️ 週報' }}</span>
-            </div>
-            <p class="text-xs text-slate-300 mb-0.5">{{ n.title }}</p>
-            <p class="text-[11px] text-slate-500">{{ n.desc }}</p>
-          </div>
-          <div v-if="notifications.length === 0" class="p-8 text-center text-slate-500 text-xs">暫無新通知</div>
-        </div>
+        <button @click="closeModal" class="p-2 hover:bg-slate-700 rounded text-slate-400 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
       </div>
 
-      <!-- Scrollable Content -->
-      <div class="flex-1 overflow-y-auto p-4 lg:p-6 scroll-smooth">
+      <!-- Modal Content -->
+      <div class="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard 
-            :title="stats.upZone.title" 
-            :value="stats.upZone.value" 
-            :unit="stats.upZone.unit"
-            :color="stats.upZone.color"
-            :description="stats.upZone.description"
-          />
-          <StatCard 
-            :title="stats.downZone.title" 
-            :value="stats.downZone.value" 
-            :unit="stats.downZone.unit"
-            :color="stats.downZone.color"
-            :description="stats.downZone.description"
-          />
-          <StatCard 
-            :title="stats.potZone.title" 
-            :value="stats.potZone.value" 
-            :unit="stats.potZone.unit"
-            :color="stats.potZone.color"
-            :description="stats.potZone.description"
-          />
-          <StatCard 
-            :title="stats.winRate.title" 
-            :value="stats.winRate.value" 
-            :unit="stats.winRate.unit"
-            :color="stats.winRate.color"
-            :description="stats.winRate.description"
-          />
-        </div>
-
-        <!-- Tabs -->
-        <div class="flex gap-6 border-b border-trading-border mb-4 text-xs font-medium">
-          <button v-for="tab in tabs" :key="tab.id" 
-            class="pb-2 px-1" 
-            :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
-            @click="activeTab = tab.id">
-            <span :class="{'text-green-400': tab.id === 'up', 'text-red-400': tab.id === 'down', 'text-blue-400': tab.id === 'pot'}">{{ tab.label }}</span>
-          </button>
-        </div>
-
-        <!-- Filters (Conditional) -->
-        <div v-if="activeTab === 'up'" class="flex gap-2 mb-4 flex-wrap items-center">
-          <span class="text-xs text-slate-500 mr-2">篩選條件:</span>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> PE < 10
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> 股價 < 15
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500" checked> 內部增持
-          </label>
-          <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
-            <input type="checkbox" class="accent-blue-500"> 流通盤 < 800萬
-          </label>
-        </div>
-
-        <!-- Stock List with Zone Panels (Tab based) -->
-        <div class="space-y-6 mb-6">
-          <ZonePanel 
-            :zone="activeTab"
-            :title="tabs.find(t => t.id === activeTab).label"
-            :stocks="filteredStocks"
-          />
-        </div>
-
-        <!-- Empty State -->
-        <div v-if="filteredStocks.length === 0" class="text-center py-20">
-          <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
-            <i class="ph-bold ph-magnifying-glass text-2xl"></i>
-          </div>
-          <p class="text-slate-500">當前板塊無符合條件標的</p>
-        </div>
-
-      </div>
-    </main>
-
-    <!-- Stock Detail Modal -->
-    <div v-if="selectedStock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="closeModal">
-      <div class="bg-slate-900 w-full max-w-4xl h-[90vh] rounded-xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-        
-        <!-- Modal Header -->
-        <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-          <div class="flex items-center gap-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold text-white" :class="selectedStock.zone === 'up' ? 'bg-green-600' : selectedStock.zone === 'down' ? 'bg-red-600' : 'bg-blue-600'">
-              {{ selectedStock.zoneLabel }}
-            </span>
-            <h2 class="text-xl font-bold mono text-white">{{ selectedStock.symbol }} <span class="text-sm text-slate-400 font-sans ml-2">{{ selectedStock.name }}</span></h2>
-          </div>
-          <button @click="closeModal" class="p-2 hover:bg-slate-700 rounded text-slate-400 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
-        </div>
-
-        <!-- Modal Content -->
-        <div class="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          <!-- Left Column: Chart & Key Stats -->
-          <div class="lg:col-span-2 space-y-6">
-            <!-- Chart Placeholder -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-300">
-                <i class="ph-bold ph-chart-line-up text-blue-400"></i> 周K線趨勢圖
-              </h3>
-              <div class="relative h-64 bg-slate-900 rounded border border-slate-700 flex items-center justify-center overflow-hidden">
-                <canvas id="stockChart" width="600" height="250"></canvas>
-                <div v-if="!chartInitialized" class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
-                  <div class="flex flex-col items-center gap-2">
-                    <i class="ph-bold ph-spinner gap-4 text-blue-500 text-2xl animate-spin"></i>
-                    <span class="text-xs text-slate-400">正在加載周線數據...</span>
-                  </div>
+        <!-- Left Column: Chart & Key Stats -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Chart Placeholder -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-300">
+              <i class="ph-bold ph-chart-line-up text-blue-400"></i> 周K線趨勢圖
+            </h3>
+            <div class="relative h-64 bg-slate-900 rounded border border-slate-700 flex items-center justify-center overflow-hidden">
+              <canvas id="stockChart" width="600" height="250"></canvas>
+              <div v-if="!chartInitialized" class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
+                <div class="flex flex-col items-center gap-2">
+                  <i class="ph-bold ph-spinner gap-4 text-blue-500 text-2xl animate-spin"></i>
+                  <span class="text-xs text-slate-400">正在加載周線數據...</span>
                 </div>
               </div>
-              <div class="flex justify-between mt-2 text-[10px] text-slate-500 px-1">
-                <span>30W MA</span>
-                <span>10W MA (神奇支撐)</span>
-                <span>當前價</span>
-              </div>
             </div>
+            <div class="flex justify-between mt-2 text-[10px] text-slate-500 px-1">
+              <span>30W MA</span>
+              <span>10W MA (神奇支撐)</span>
+              <span>當前價</span>
+            </div>
+          </div>
 
-            <!-- Execution Checklist -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-300">
-                <i class="ph-bold ph-checklist text-green-400"></i> 「一分鐘伏擊」規則檢核
-              </h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div v-for="rule in selectedStock.rules" :key="rule.label" class="flex items-start gap-2 p-2 rounded bg-slate-800/50">
-                  <i :class="['ph-fill', rule.pass ? 'ph-check-circle text-green-500' : 'ph-x-circle text-slate-600']" class="mt-0.5 text-sm"></i>
-                  <div>
-                    <p class="text-xs text-slate-200">{{ rule.label }}</p>
-                    <p class="text-[10px] text-slate-500">{{ rule.desc }}</p>
-                  </div>
+          <!-- Execution Checklist -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-300">
+              <i class="ph-bold ph-checklist text-green-400"></i> 「一分鐘伏擊」規則檢核
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div v-for="rule in selectedStock.rules" :key="rule.label" class="flex items-start gap-2 p-2 rounded bg-slate-800/50">
+                <i :class="['ph-fill', rule.pass ? 'ph-check-circle text-green-500' : 'ph-x-circle text-slate-600']" class="mt-0.5 text-sm"></i>
+                <div>
+                  <p class="text-xs text-slate-200">{{ rule.label }}</p>
+                  <p class="text-[10px] text-slate-500">{{ rule.desc }}</p>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Right Column: Details & Actions -->
-          <div class="space-y-4">
-            <!-- Financials -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">基本面與資金面</h3>
-              <ul class="space-y-3">
-                <li class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">市盈率 (PE)</span>
-                  <span class="mono font-bold text-slate-200">{{ selectedStock.pe }} <span class="text-xs text-green-400 font-normal">(<10 ✅)</span></span>
-                </li>
-                <li class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">流通市值</span>
-                  <span class="mono text-slate-200">{{ selectedStock.mktCap }}</span>
-                </li>
-                <li class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">內部交易</span>
-                  <span class="mono text-green-400 flex items-center gap-1"><i class="ph-bold ph-trend-up text-xs"></i> {{ selectedStock.insider }}</span>
-                </li>
-                <li class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">題材熱度</span>
-                  <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">{{ selectedStock.topic }}</span>
-                </li>
-              </ul>
+        <!-- Right Column: Details & Actions -->
+        <div class="space-y-4">
+          <!-- Financials -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">基本面與資金面</h3>
+            <ul class="space-y-3">
+              <li class="flex justify-between items-center text-sm">
+                <span class="text-slate-400">市盈率 (PE)</span>
+                <span class="mono font-bold text-slate-200">{{ selectedStock.pe }} <span class="text-xs text-green-400 font-normal">(<10 ✅)</span></span>
+              </li>
+              <li class="flex justify-between items-center text-sm">
+                <span class="text-slate-400">流通市值</span>
+                <span class="mono text-slate-200">{{ selectedStock.mktCap }}</span>
+              </li>
+              <li class="flex justify-between items-center text-sm">
+                <span class="text-slate-400">內部交易</span>
+                <span class="mono text-green-400 flex items-center gap-1"><i class="ph-bold ph-trend-up text-xs"></i> {{ selectedStock.insider }}</span>
+              </li>
+              <li class="flex justify-between items-center text-sm">
+                <span class="text-slate-400">題材熱度</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">{{ selectedStock.topic }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-3">
+            <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">交易執行</h3>
+            <p class="text-xs text-slate-500 bg-slate-800 p-2 rounded border border-slate-700 border-l-2 border-l-blue-500">
+              <i class="ph-bold ph-info mr-1"></i> 系統建議：{{ selectedStock.suggestion }}
+            </p>
+            
+            <button class="w-full py-2 rounded bg-green-600 hover:bg-green-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2" v-if="selectedStock.zone === 'up'">
+              <i class="ph-bold ph-hand-buying"></i> 加入買入清單
+            </button>
+            <button class="w-full py-2 rounded bg-red-900/50 hover:bg-red-900 text-red-400 border border-red-800 hover:text-red-200 font-bold text-sm transition-colors flex items-center justify-center gap-2" v-else-if="selectedStock.zone === 'down'">
+              <i class="ph-bold ph-skull"></i> 確認清倉記錄
+            </button>
+            <button class="w-full py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2" v-else>
+              <i class="ph-bold ph-plus"></i> 加入驗證池跟蹤
+            </button>
+
+            <div class="pt-2 border-t border-slate-700">
+              <label class="flex items-center gap-2 cursor-pointer group">
+                <div class="w-4 h-4 border border-slate-600 rounded flex items-center justify-center group-hover:border-blue-500">
+                  <i class="ph-bold ph-check text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+                <span class="text-xs text-slate-400">我已閱讀並理解報告風險提示</span>
+              </label>
             </div>
+          </div>
 
-            <!-- Action Buttons -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-3">
-              <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">交易執行</h3>
-              <p class="text-xs text-slate-500 bg-slate-800 p-2 rounded border border-slate-700 border-l-2 border-l-blue-500">
-                <i class="ph-bold ph-info mr-1"></i> 系統建議：{{ selectedStock.suggestion }}
-              </p>
-              
-              <button class="w-full py-2 rounded bg-green-600 hover:bg-green-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2" v-if="selectedStock.zone === 'up'">
-                <i class="ph-bold ph-hand-buying"></i> 加入買入清單
-              </button>
-              <button class="w-full py-2 rounded bg-red-900/50 hover:bg-red-900 text-red-400 border border-red-800 hover:text-red-200 font-bold text-sm transition-colors flex items-center justify-center gap-2" v-else-if="selectedStock.zone === 'down'">
-                <i class="ph-bold ph-skull"></i> 確認清倉記錄
-              </button>
-              <button class="w-full py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2" v-else>
-                <i class="ph-bold ph-plus"></i> 加入驗證池跟蹤
-              </button>
-
-              <div class="pt-2 border-t border-slate-700">
-                <label class="flex items-center gap-2 cursor-pointer group">
-                  <div class="w-4 h-4 border border-slate-600 rounded flex items-center justify-center group-hover:border-blue-500">
-                    <i class="ph-bold ph-check text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                  </div>
-                  <span class="text-xs text-slate-400">我已閱讀並理解報告風險提示</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Log -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">風控日誌</h3>
-              <div class="space-y-2 text-xs text-slate-500">
-                <div class="flex gap-2"><span class="mono text-slate-600">05-17</span> <span>周線突破30W均線，量價共振</span></div>
-                <div class="flex gap-2"><span class="mono text-slate-600">05-19</span> <span>縮量回踩10W均線，信號確認</span></div>
-              </div>
+          <!-- Log -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+            <h3 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">風控日誌</h3>
+            <div class="space-y-2 text-xs text-slate-500">
+              <div class="flex gap-2"><span class="mono text-slate-600">05-17</span> <span>周線突破30W均線，量價共振</span></div>
+              <div class="flex gap-2"><span class="mono text-slate-600">05-19</span> <span>縮量回踩10W均線，信號確認</span></div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-  <router-view />
 </template>
 
 <style scoped>
