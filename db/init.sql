@@ -2,7 +2,7 @@
 -- 一分鐘伏擊超級強勢股智能監控系統
 -- 資料庫初始化腳本 (init.sql)
 -- 適用於 PostgreSQL 16
--- 版本：V1.1 | 2026-06-01
+-- 版本：V2.0 | 2026-06-03（優化版：雙表基本面 + 分鐘線 + 拉姆止損）
 -- ==========================================
 
 -- 啟用必要擴展
@@ -24,6 +24,7 @@ CREATE TABLE stock_bar (
     low NUMERIC(12,4),
     close NUMERIC(12,4),
     volume BIGINT,
+    amount BIGINT,
     change_pct NUMERIC(6,2),
     ma10_w NUMERIC(12,4),
     ma30_w NUMERIC(12,4),
@@ -35,6 +36,7 @@ CREATE TABLE stock_bar (
 CREATE TABLE stock_bar_2025 PARTITION OF stock_bar FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
 CREATE TABLE stock_bar_2026 PARTITION OF stock_bar FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
 CREATE TABLE stock_bar_2027 PARTITION OF stock_bar FOR VALUES FROM ('2027-01-01') TO ('2028-01-01');
+CREATE TABLE stock_bar_2028 PARTITION OF stock_bar FOR VALUES FROM ('2028-01-01') TO ('2029-01-01');
 
 -- 索引
 CREATE UNIQUE INDEX idx_bar_code_date ON stock_bar(code, trade_date DESC);
@@ -45,9 +47,10 @@ CREATE INDEX idx_bar_ma30 ON stock_bar(ma30_w) WHERE ma30_w IS NOT NULL;
 COMMENT ON TABLE stock_bar IS '週線行情與技術指標表（OHLCV+MA10/MA30/VolumeMA5）';
 COMMENT ON COLUMN stock_bar.code IS '股票代碼';
 COMMENT ON COLUMN stock_bar.name IS '股票名稱（前端顯示用）';
-COMMENT ON COLUMN stock_bar.market IS '市場：TW=台股, US=美股';
+COMMENT ON COLUMN stock_bar.market IS '市場：TW=台股, US=美股, HK=港股';
 COMMENT ON COLUMN stock_bar.trade_date IS '交易日（週五收盤日）';
 COMMENT ON COLUMN stock_bar.freq IS '頻率：D=日線, W=週線, M=月線';
+COMMENT ON COLUMN stock_bar.amount IS '成交金額';
 COMMENT ON COLUMN stock_bar.change_pct IS '週漲跌幅百分比（前端顯示用）';
 COMMENT ON COLUMN stock_bar.ma10_w IS '10週移動平均線（策略生命線）';
 COMMENT ON COLUMN stock_bar.ma30_w IS '30週移動平均線（趨勢錨點）';
@@ -102,6 +105,8 @@ CREATE TABLE stock_signal_log (
 
 CREATE TABLE stock_signal_log_2025 PARTITION OF stock_signal_log FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
 CREATE TABLE stock_signal_log_2026 PARTITION OF stock_signal_log FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+CREATE TABLE stock_signal_log_2027 PARTITION OF stock_signal_log FOR VALUES FROM ('2027-01-01') TO ('2028-01-01');
+CREATE TABLE stock_signal_log_2028 PARTITION OF stock_signal_log FOR VALUES FROM ('2028-01-01') TO ('2029-01-01');
 
 -- 索引
 CREATE UNIQUE INDEX idx_sig_code_date ON stock_signal_log(code, trade_date DESC);
@@ -219,4 +224,104 @@ INSERT INTO system_config (config_key, config_value, description) VALUES
     "risk_consecutive_weeks": 2
 }', '規則引擎參數配置'),
 ('data_source.primary', '"yfinance"', '主數據源'),
-('data_source.fallback', '"akshare"', '備用數據源');
+('data_source.fallback', '"yfinance"', '備用數據源（暫與主數據源相同）'),
+('ram_stop_loss.params', '{
+    "drawdown_ratio": 0.08,
+    "trailing_high_period": "all",
+    "check_interval_seconds": 60
+}', '拉姆止損參數配置');
+
+-- ==========================================
+-- 8. 最新基本面緩存表（優化批量篩選性能）
+-- ==========================================
+CREATE TABLE stock_fundamental_latest (
+    code VARCHAR(20) PRIMARY KEY,
+    market VARCHAR(4) NOT NULL DEFAULT 'TW',
+    report_date DATE NOT NULL,
+    pe_ttm NUMERIC(10,4),
+    eps_ttm NUMERIC(10,4),
+    float_shares BIGINT,
+    debt_ratio NUMERIC(6,4),
+    insider_net_buy_3m BIGINT,
+    pb NUMERIC(10,4),
+    dividend_yield NUMERIC(8,4),
+    total_market_cap NUMERIC(18,2),
+    net_profit_ttm NUMERIC(18,2),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_fund_latest_pe_eps ON stock_fundamental_latest(pe_ttm, eps_ttm);
+CREATE INDEX idx_fund_latest_market ON stock_fundamental_latest(market);
+
+COMMENT ON TABLE stock_fundamental_latest IS '最新基本面緩存表（每隻股票僅保留最新一筆，用於批量篩選）';
+COMMENT ON COLUMN stock_fundamental_latest.code IS '股票代碼（主鍵）';
+COMMENT ON COLUMN stock_fundamental_latest.market IS '市場：TW=台股, US=美股, HK=港股';
+COMMENT ON COLUMN stock_fundamental_latest.report_date IS '報告日期';
+COMMENT ON COLUMN stock_fundamental_latest.pe_ttm IS '滾動本益比（TTM）';
+COMMENT ON COLUMN stock_fundamental_latest.eps_ttm IS '滾動每股盈餘（TTM）';
+COMMENT ON COLUMN stock_fundamental_latest.pb IS '股價淨值比';
+COMMENT ON COLUMN stock_fundamental_latest.dividend_yield IS '股息率（%）';
+COMMENT ON COLUMN stock_fundamental_latest.total_market_cap IS '總市值';
+COMMENT ON COLUMN stock_fundamental_latest.net_profit_ttm IS '滾動淨利潤（TTM）';
+
+-- ==========================================
+-- 9. 分鐘線行情表（拉姆止損專用）
+-- ==========================================
+CREATE TABLE stock_bar_minute (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    code VARCHAR(20) NOT NULL,
+    trade_time TIMESTAMPTZ NOT NULL,
+    open NUMERIC(12,4),
+    high NUMERIC(12,4),
+    low NUMERIC(12,4),
+    close NUMERIC(12,4),
+    volume BIGINT,
+    is_valid BOOLEAN DEFAULT TRUE,
+    corrected_open NUMERIC(12,4),
+    corrected_close NUMERIC(12,4),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT uq_code_minute UNIQUE(code, trade_time)
+);
+
+CREATE INDEX idx_minute_code_time ON stock_bar_minute(code, trade_time DESC);
+
+COMMENT ON TABLE stock_bar_minute IS '分鐘線行情表（拉姆動態止損專用）';
+COMMENT ON COLUMN stock_bar_minute.code IS '股票代碼';
+COMMENT ON COLUMN stock_bar_minute.trade_time IS '交易時間（分鐘級）';
+COMMENT ON COLUMN stock_bar_minute.is_valid IS '數據是否有效（FALSE表示可疑記錄）';
+COMMENT ON COLUMN stock_bar_minute.corrected_open IS '修正後開盤價';
+COMMENT ON COLUMN stock_bar_minute.corrected_close IS '修正後收盤價（止損計算使用此字段）';
+
+-- ==========================================
+-- 10. 拉姆止損狀態表
+-- ==========================================
+CREATE TABLE ram_stop_loss (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    code VARCHAR(20) NOT NULL,
+    market VARCHAR(4) NOT NULL DEFAULT 'TW',
+    buy_date DATE NOT NULL,
+    buy_price NUMERIC(12,4) NOT NULL,
+    highest_price NUMERIC(12,4) NOT NULL,
+    current_price NUMERIC(12,4) NOT NULL,
+    stop_loss_price NUMERIC(12,4) NOT NULL,
+    drawdown_pct NUMERIC(6,4) DEFAULT 0,
+    is_triggered BOOLEAN DEFAULT FALSE,
+    triggered_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT uq_ram_code UNIQUE(code)
+);
+
+CREATE INDEX idx_ram_active ON ram_stop_loss(is_active) WHERE is_active = TRUE;
+
+COMMENT ON TABLE ram_stop_loss IS '拉姆動態止損狀態表';
+COMMENT ON COLUMN ram_stop_loss.code IS '股票代碼（唯一）';
+COMMENT ON COLUMN ram_stop_loss.buy_date IS '買入日期';
+COMMENT ON COLUMN ram_stop_loss.buy_price IS '買入價格';
+COMMENT ON COLUMN ram_stop_loss.highest_price IS '持有期間最高價（動態更新）';
+COMMENT ON COLUMN ram_stop_loss.current_price IS '當前價格';
+COMMENT ON COLUMN ram_stop_loss.stop_loss_price IS '止損價格（最高價 × (1 - drawdown_ratio)）';
+COMMENT ON COLUMN ram_stop_loss.drawdown_pct IS '當前回撤比例';
+COMMENT ON COLUMN ram_stop_loss.is_triggered IS '是否已觸發止損';
+COMMENT ON COLUMN ram_stop_loss.is_active IS '是否啟用中';

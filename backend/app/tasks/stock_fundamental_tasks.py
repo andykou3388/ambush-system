@@ -1,6 +1,7 @@
 """
 通用股票基本面數據獲取任務
 從 YFinance 獲取股票基本面數據並保存到 stock_fundamental 表
+V2.0 優化：同時寫入 stock_fundamental_latest 緩存表
 """
 from celery import shared_task
 from yfinance import Ticker
@@ -10,13 +11,14 @@ import logging
 from sqlalchemy.dialects.postgresql import insert
 from app.database import SessionLocal
 from app.models.stock_fundamental import StockFundamental
+from app.models.stock_fundamental_latest import StockFundamentalLatest
 
 logger = logging.getLogger(__name__)
 
 
 def save_to_database(data_list: list):
     """
-    批量保存基本面數據到資料庫（使用 UPSERT 避免唯一約束衝突）
+    批量保存基本面數據到資料庫（雙表寫入）
     
     Args:
         data_list: 基本面數據列表
@@ -24,6 +26,7 @@ def save_to_database(data_list: list):
     db = SessionLocal()
     try:
         for data in data_list:
+            # 1. 寫入歷史表（原有邏輯，使用 UPSERT 避免唯一約束衝突）
             stmt = insert(StockFundamental).values(**data)
             stmt = stmt.on_conflict_do_update(
                 constraint="uq_code_report",
@@ -37,8 +40,29 @@ def save_to_database(data_list: list):
                 },
             )
             db.execute(stmt)
+            
+            # 2. 寫入最新緩存表（新增邏輯）
+            # 只保留 latest 表需要的字段
+            latest_data = {
+                "code": data["code"],
+                "market": data["market"],
+                "report_date": data["report_date"],
+                "pe_ttm": data["pe_ttm"],
+                "eps_ttm": data["eps_ttm"],
+                "float_shares": data["float_shares"],
+                "debt_ratio": data["debt_ratio"],
+                "insider_net_buy_3m": data["insider_net_buy_3m"],
+                "updated_at": data["updated_at"],
+            }
+            upsert_latest = insert(StockFundamentalLatest).values(**latest_data)
+            upsert_latest = upsert_latest.on_conflict_do_update(
+                constraint="stock_fundamental_latest_pkey",
+                set_=latest_data
+            )
+            db.execute(upsert_latest)
+            
         db.commit()
-        logger.info(f"批量保存 {len(data_list)} 條基本面數據")
+        logger.info(f"批量保存 {len(data_list)} 條基本面數據（含 latest 緩存表）")
     except Exception as e:
         db.rollback()
         logger.error(f"保存數據失敗: {e}")
@@ -53,7 +77,7 @@ def fetch_stock_fundamentals(self, stock_codes: list):
     批量獲取股票基本面數據的通用任務
     
     Args:
-        stock_codes: 股票代碼列表，例如 ['0005.HK', '9988.HK', '0700.HK']
+        stock_codes: 股票代碼列表，例如 ['2330.TW', '2317.TW', '0700.HK']
         
     Returns:
         dict: 包含處理結果的字典
@@ -89,9 +113,21 @@ def fetch_stock_fundamentals(self, stock_codes: list):
                     if debt_to_equity is not None:
                         debt_to_equity = round(debt_to_equity / 100, 4)
                     
+                    # 判斷市場
+                    if "." in symbol:
+                        suffix = symbol.split(".")[-1]
+                        if suffix == "TW":
+                            market = "TW"
+                        elif suffix == "HK":
+                            market = "HK"
+                        else:
+                            market = suffix
+                    else:
+                        market = "US"
+                    
                     fundamental_data = {
                         "code": symbol,
-                        "market": symbol.split(".")[-1] if "." in symbol else "HK",
+                        "market": market,
                         "report_date": datetime.now().date(),
                         "pe_ttm": info.get("trailingPE"),
                         "eps_ttm": info.get("trailingEps"),
@@ -140,7 +176,7 @@ def fetch_single_stock_fundamental(self, symbol: str):
     獲取單一股票基本面數據
     
     Args:
-        symbol: 股票代碼，例如 '0005.HK'
+        symbol: 股票代碼，例如 '2330.TW'
         
     Returns:
         dict: 股票基本面數據
@@ -156,9 +192,21 @@ def fetch_single_stock_fundamental(self, symbol: str):
         if debt_to_equity is not None:
             debt_to_equity = round(debt_to_equity / 100, 4)
         
+        # 判斷市場
+        if "." in symbol:
+            suffix = symbol.split(".")[-1]
+            if suffix == "TW":
+                market = "TW"
+            elif suffix == "HK":
+                market = "HK"
+            else:
+                market = suffix
+        else:
+            market = "US"
+        
         fundamental_data = {
             "code": symbol,
-            "market": symbol.split(".")[-1] if "." in symbol else "HK",
+            "market": market,
             "report_date": datetime.now().date(),
             "pe_ttm": info.get("trailingPE"),
             "eps_ttm": info.get("trailingEps"),

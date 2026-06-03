@@ -5,6 +5,7 @@ from app.routers import health
 from app.routers.screener import router as screener_router
 from app.routers.stock_detail import router as stock_detail_router
 from app.routers.stock_fundamental_api import router as stock_fundamental_router
+from app.routers.ram_stop_loss_api import router as ram_stop_loss_router
 from app.database import check_db_connection
 
 
@@ -22,8 +23,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Ambush System API",
-    description="伏擊系統後端 API",
-    version="1.0.0",
+    description="伏擊系統後端 API - V2.0 含拉姆止損",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -43,3 +44,4 @@ app.include_router(health.router)
 app.include_router(screener_router)
 app.include_router(stock_detail_router)
 app.include_router(stock_fundamental_router)
+app.include_router(ram_stop_loss_router)

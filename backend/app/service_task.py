@@ -1,6 +1,7 @@
 """
 週期性分析任務
 實現週五收盤後的完整分析流程
+V2.0 優化：使用 stock_fundamental_latest 緩存表進行基本面查詢
 """
 from celery import shared_task
 from celery.utils.log import get_task_logger

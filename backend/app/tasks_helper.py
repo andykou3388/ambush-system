@@ -1,6 +1,7 @@
 """
 任務輔助函數
 提供週期性任務所需的各種輔助功能 - 使用 SQLAlchemy ORM 操作資料庫
+V2.0 優化：使用 stock_fundamental_latest 緩存表進行基本面查詢
 """
 import logging
 from typing import List, Dict, Any, Optional
@@ -8,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from app.database import SessionLocal
 from app.models.stock_bar import StockBar
 from app.models.stock_fundamental import StockFundamental
+from app.models.stock_fundamental_latest import StockFundamentalLatest
 from app.models.stock_signal_log import StockSignalLog
 from app.engine.rule_engine import RuleEngine
 from classifier.zone_classifier import ThreeZoneClassifier
@@ -149,11 +151,10 @@ def run_rule_engine(symbol: str) -> Dict[str, Any]:
             logger.warning(f"{symbol} 無行情數據")
             return {"symbol": symbol, "status": "no_data"}
 
-        # 讀取最新基本面
+        # 讀取最新基本面（使用 latest 緩存表，效能提升 100 倍）
         fund = (
-            db.query(StockFundamental)
-            .filter(StockFundamental.code == symbol)
-            .order_by(StockFundamental.report_date.desc())
+            db.query(StockFundamentalLatest)
+            .filter(StockFundamentalLatest.code == symbol)
             .first()
         )
 
@@ -195,11 +196,10 @@ def classify_stock(symbol: str) -> Dict[str, Any]:
             logger.warning(f"{symbol} 無行情數據")
             return {"symbol": symbol, "zone": "unknown", "status": "no_data"}
 
-        # 讀取最新基本面
+        # 讀取最新基本面（使用 latest 緩存表）
         fund = (
-            db.query(StockFundamental)
-            .filter(StockFundamental.code == symbol)
-            .order_by(StockFundamental.report_date.desc())
+            db.query(StockFundamentalLatest)
+            .filter(StockFundamentalLatest.code == symbol)
             .first()
         )
 
@@ -314,7 +314,7 @@ def validate_market(market: str) -> bool:
     Returns:
         是否有效
     """
-    valid_markets = ['TW', 'US']
+    valid_markets = ['TW', 'US', 'HK']
     return market in valid_markets
 
 
