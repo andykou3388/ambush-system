@@ -85,3 +85,4 @@ celery_app.autodiscover_tasks(["app.tasks"])
 import app.tasks.stock_fundamental_tasks
 import app.tasks.minute_data_tasks
 import app.tasks.weekly_tasks
+import app.tasks.oneclick_init_task

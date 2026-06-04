@@ -117,19 +117,26 @@ def check_all_stop_loss(self):
         raise self.retry(exc=exc)
 
 
+def _daily_minute_validation_impl():
+    """
+    每日收盤後批量處理數據缺失與成交量異常（非 Celery 任務版本）
+    供 Celery 任務和一次性初始化任務直接調用
+    """
+    logger.info("開始每日分鐘線數據校驗")
+    engine = RamStopLossEngine()
+    result = engine.daily_validation()
+    
+    logger.info(f"每日校驗完成: {result}")
+    return result
+
+
 @shared_task(bind=True, max_retries=1)
 def daily_minute_validation(self):
     """
     每日收盤後批量處理數據缺失與成交量異常
     """
     try:
-        logger.info("開始每日分鐘線數據校驗")
-        engine = RamStopLossEngine()
-        result = engine.daily_validation()
-        
-        logger.info(f"每日校驗完成: {result}")
-        return result
-        
+        return _daily_minute_validation_impl()
     except Exception as exc:
         logger.error(f"每日校驗失敗: {exc}")
         raise self.retry(exc=exc)

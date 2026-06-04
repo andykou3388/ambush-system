@@ -21,8 +21,23 @@ class Rule4Valuation:
         """
         price_cfg = self.cfg
 
-        cond1 = row.get("close", 999) < price_cfg["max_price"]
-        cond2 = row.get("pe", 999) < price_cfg["max_pe"]
-        cond3 = row.get("market_cap", 9e9) < price_cfg["max_market_cap"]
+        # 處理 None 值：如果欄位為 None，視為不符合條件
+        close = row.get("close")
+        if close is None:
+            cond1 = False
+        else:
+            cond1 = close < price_cfg["max_price"]
+
+        pe = row.get("pe")
+        if pe is None:
+            cond2 = False
+        else:
+            cond2 = pe < price_cfg["max_pe"]
+
+        market_cap = row.get("market_cap")
+        if market_cap is None:
+            cond3 = False
+        else:
+            cond3 = market_cap < price_cfg["max_market_cap"]
 
         return cond1 and cond2 and cond3
