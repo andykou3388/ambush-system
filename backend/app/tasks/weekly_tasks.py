@@ -7,6 +7,7 @@ import logging
 from typing import List
 
 from celery import shared_task
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from app.database import SessionLocal
 from app.models.stock_bar import StockBar
@@ -19,7 +20,7 @@ from classifier.zone_classifier import ThreeZoneClassifier
 logger = logging.getLogger(__name__)
 
 
-def _calculate_weekly_indicators_impl(market: str = "TW"):
+def _calculate_weekly_indicators_impl(market: str = "HK"):
     """
     計算指定市場所有股票的週線技術指標（非 Celery 任務版本）
     供 Celery 任務和一次性初始化任務直接調用
@@ -28,11 +29,12 @@ def _calculate_weekly_indicators_impl(market: str = "TW"):
         market: 市場代碼，預設 'TW'
     """
     logger.info(f"開始計算 {market} 市場的週線技術指標")
+    market = (market or "").upper()
     db = SessionLocal()
     try:
-        # 獲取所有股票代碼
+        # 獲取所有股票代碼（大小寫無關）
         stocks = db.query(StockBar.code).filter(
-            StockBar.market == market
+            func.upper(StockBar.market) == market
         ).distinct().all()
         
         codes = [s.code for s in stocks]
@@ -109,11 +111,12 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
         market: 市場代碼，預設 'TW'
     """
     logger.info(f"開始執行 {market} 市場的規則引擎")
+    market = (market or "").upper()
     db = SessionLocal()
     try:
-        # 獲取所有股票代碼
+        # 獲取所有股票代碼（大小寫無關）
         stocks = db.query(StockBar.code).filter(
-            StockBar.market == market
+            func.upper(StockBar.market) == market
         ).distinct().all()
         
         codes = [s.code for s in stocks]
@@ -174,7 +177,7 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
                 }
                 stmt = insert(StockSignalLog).values(**signal_data)
                 stmt = stmt.on_conflict_do_update(
-                    constraint="uq_sig_code_date",
+                    index_elements=["code", "trade_date"],
                     set_={
                         "zone": zone,
                         "confidence": confidence,
