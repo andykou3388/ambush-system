@@ -78,3 +78,10 @@ celery_app.conf.beat_schedule = {
 
 # 自動發現任務
 celery_app.autodiscover_tasks(["app.tasks"])
+
+# ==========================================
+# 手動導入任務模組（確保任務被註冊）
+# ==========================================
+import app.tasks.stock_fundamental_tasks
+import app.tasks.minute_data_tasks
+import app.tasks.weekly_tasks
