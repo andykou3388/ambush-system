@@ -26,9 +26,9 @@ class Rule5Fundamental:
         if debt_ratio is None:
             cond1 = True  # 如果沒有負債比數據，視為符合條件
         else:
-            cond1 = debt_ratio < fund_cfg["low_debt_ratio"]
+            cond1 = float(debt_ratio) < float(fund_cfg["low_debt_ratio"])
             
-        cond2 = row.get("insider_buy", 0) == 1
-        cond3 = row.get("analyst_cover", 1) == 0
+        cond2 = float(row.get("insider_buy", 0)) == 1
+        cond3 = float(row.get("analyst_cover", 1)) == 0
 
         return cond1 and cond2 and cond3

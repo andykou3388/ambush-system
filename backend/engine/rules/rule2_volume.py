@@ -15,14 +15,17 @@ class Rule2Volume:
         Returns:
             True 表示成交量异常放量（>= 5倍均量）
         """
-        vol_current = row.get("volume", 0)
+        vol_current = float(row.get("volume", 0))
 
         # 如果没有传入 vol_ma5，尝试从 row 中获取
         if vol_ma5 is None:
             vol_ma5 = row.get("vol_ma5", 0)
 
+        # 確保型別為 float（避免 Decimal * float 錯誤）
+        vol_ma5 = float(vol_ma5) if vol_ma5 else 0.0
+
         if vol_ma5 <= 0:
             return False
 
-        ratio = self.cfg["volume_boost_ratio"]
+        ratio = float(self.cfg["volume_boost_ratio"])
         return vol_current >= vol_ma5 * ratio

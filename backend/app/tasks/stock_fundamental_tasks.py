@@ -16,6 +16,29 @@ from app.models.stock_fundamental_latest import StockFundamentalLatest
 logger = logging.getLogger(__name__)
 
 
+def _safe_numeric(value):
+    """
+    將 YFinance 回傳的值轉為安全的數值，過濾 Infinity/NaN 等非數值
+    
+    Args:
+        value: 原始值（可能是 None, str, int, float）
+        
+    Returns:
+        float 或 None（當值為 Infinity/NaN 時回傳 None）
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and value.lower() in ("infinity", "-infinity", "nan", "inf", "-inf"):
+        return None
+    try:
+        v = float(value)
+        if v == float('inf') or v == float('-inf') or v != v:  # v != v 檢測 NaN
+            return None
+        return v
+    except (ValueError, TypeError):
+        return None
+
+
 def save_to_database(data_list: list):
     """
     批量保存基本面數據到資料庫（雙表寫入）
@@ -128,8 +151,8 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                     "code": symbol,
                     "market": market,
                     "report_date": datetime.now().date(),
-                    "pe_ttm": info.get("trailingPE"),
-                    "eps_ttm": info.get("trailingEps"),
+                    "pe_ttm": _safe_numeric(info.get("trailingPE")),
+                    "eps_ttm": _safe_numeric(info.get("trailingEps")),
                     "float_shares": info.get("floatShares"),
                     "debt_ratio": debt_to_equity,
                     "insider_net_buy_3m": info.get("insiderTransactions"),
@@ -221,8 +244,8 @@ def fetch_single_stock_fundamental(self, symbol: str):
             "code": symbol,
             "market": market,
             "report_date": datetime.now().date(),
-            "pe_ttm": info.get("trailingPE"),
-            "eps_ttm": info.get("trailingEps"),
+            "pe_ttm": _safe_numeric(info.get("trailingPE")),
+            "eps_ttm": _safe_numeric(info.get("trailingEps")),
             "float_shares": info.get("floatShares"),
             "debt_ratio": debt_to_equity,
             "insider_net_buy_3m": info.get("insiderTransactions"),

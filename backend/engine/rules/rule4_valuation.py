@@ -26,18 +26,18 @@ class Rule4Valuation:
         if close is None:
             cond1 = False
         else:
-            cond1 = close < price_cfg["max_price"]
+            cond1 = float(close) < float(price_cfg["max_price"])
 
         pe = row.get("pe")
         if pe is None:
             cond2 = False
         else:
-            cond2 = pe < price_cfg["max_pe"]
+            cond2 = float(pe) < float(price_cfg["max_pe"])
 
         market_cap = row.get("market_cap")
         if market_cap is None:
             cond3 = False
         else:
-            cond3 = market_cap < price_cfg["max_market_cap"]
+            cond3 = float(market_cap) < float(price_cfg["max_market_cap"])
 
         return cond1 and cond2 and cond3

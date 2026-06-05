@@ -145,6 +145,10 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
                 rule_result = engine.run_from_db(bar, fund)
                 
                 # 執行三區分類
+                # 規則引擎標籤 → 三區對應：
+                #   UPTREND   : 上升交易（买点）— 強勢買入信號
+                #   POTENTIAL : 潜在实力股（观察）/ 观望 — 持有或觀察（靠信心度區分）
+                #   DOWNTREND : 下跌参考（警示）— 風險警示
                 label = rule_result.get("label", "观望")
                 zone_map = {
                     "上升交易（买点）": "UPTREND",

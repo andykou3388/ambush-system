@@ -118,16 +118,17 @@ class RuleEngine:
             "close": float(bar.close) if bar.close else 0,
             "ma10": float(bar.ma10_w) if bar.ma10_w else 0,
             "ma30": float(bar.ma30_w) if bar.ma30_w else 0,
-            "volume": bar.volume or 0,
+            "volume": float(bar.volume) if bar.volume else 0,
+            "vol_ma5": float(bar.volume_ma5_w) if bar.volume_ma5_w else 0,
             "pe": float(fund.pe_ttm) if fund and fund.pe_ttm else None,
             "market_cap": (float(fund.float_shares) * float(bar.close)) if fund and fund.float_shares and bar.close else None,
             "debt_ratio": float(fund.debt_ratio) if fund and fund.debt_ratio else None,
-            "insider_buy": fund.insider_net_buy_3m if fund and fund.insider_net_buy_3m else 0,
+            "insider_buy": float(fund.insider_net_buy_3m) if fund and fund.insider_net_buy_3m else 0,
         }
 
         # 執行 5 層規則
         r1 = self.evaluate_rule1(row)
-        r2 = self.evaluate_rule2(row, bar.volume_ma5_w or 0)
+        r2 = self.evaluate_rule2(row, float(bar.volume_ma5_w) if bar.volume_ma5_w else 0)
         r3 = self.evaluate_rule3(row)
         r4 = self.evaluate_rule4(row)
         r5 = self.evaluate_rule5(row)
