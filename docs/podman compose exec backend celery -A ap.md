@@ -138,7 +138,7 @@ celery -A app.tasks.oneclick_init_task call oneclick_init_data
 podman-compose exec backend bash
 python -c "
 from app.tasks.stock_fundamental_tasks import _fetch_stock_fundamentals_impl
-codes = ['0001.HK', '0003.HK']
+codes = ['0001.HK', '0003.HK', '0005.HK', '0006.HK', '0007.HK', '0008.HK', '0009.HK', '0010.HK', '0011.HK', '0012.HK', '0013.HK', '0016.HK', '0017.HK', '0019.HK', '0020.HK', '0021.HK', '0022.HK', '0023.HK', '0024.HK', '0025.HK', '0026.HK', '0027.HK', '0028.HK', '0029.HK', '0030.HK', '0031.HK', '0032.HK', '0033.HK', '0034.HK', '0035.HK', '0036.HK', '0037.HK', '0038.HK', '0039.HK', '0040.HK', '0041.HK', '0042.HK', '0043.HK', '0044.HK', '0045.HK', '0046.HK', '0047.HK', '0048.HK', '0049.HK', '0050.HK', '0051.HK', '0052.HK', '0053.HK', '0054.HK', '0055.HK', '0056.HK', '0057.HK', '0058.HK', '0059.HK', '0060.HK', '0061.HK', '0062.HK', '0063.HK', '0064.HK', '0065.HK', '0066.HK', '0067.HK', '0068.HK', '0069.HK', '0070.HK', '0071.HK', '0072.HK', '0073.HK', '0074.HK', '0075.HK', '0076.HK', '0077.HK', '0078.HK', '0079.HK', '0080.HK', '0081.HK', '0082.HK', '0083.HK', '0084.HK', '0085.HK', '0086.HK', '0087.HK', '0088.HK', '0089.HK', '0090.HK', '0091.HK', '0092.HK', '0093.HK', '0094.HK', '0095.HK', '0096.HK', '0097.HK', '0098.HK', '0099.HK', '0100.HK']
 result = _fetch_stock_fundamentals_impl(codes)
 print('基本面數據獲取結果:', result)
 "
@@ -151,4 +151,24 @@ print('完整任務結果:', result)
 "
 ```
 
-這樣可以幫助您逐步排查問題並確認每個步驟是否正常運作。
+python -c "
+from app.tasks.oneclick_init_task import _fetch_weekly_bars_impl
+# 使用您之前提供的股票代碼列表
+codes = ['0001.HK', '0003.HK', '0005.HK', '0006.HK', '0007.HK', '0008.HK', '0009.HK', '0010.HK', '0011.HK', '0012.HK', '0013.HK', '0016.HK', '0017.HK', '0019.HK', '0020.HK', '0021.HK', '0022.HK', '0023.HK', '0024.HK', '0025.HK', '0026.HK', '0027.HK', '0028.HK', '0029.HK', '0030.HK', '0031.HK', '0032.HK', '0033.HK', '0034.HK', '0035.HK', '0036.HK', '0037.HK', '0038.HK', '0039.HK', '0040.HK', '0041.HK', '0042.HK', '0043.HK', '0044.HK', '0045.HK', '0046.HK', '0047.HK', '0048.HK', '0049.HK', '0050.HK', '0051.HK', '0052.HK', '0053.HK', '0054.HK', '0055.HK', '0056.HK', '0057.HK', '0058.HK', '0059.HK', '0060.HK', '0061.HK', '0062.HK', '0063.HK', '0064.HK', '0065.HK', '0066.HK', '0067.HK', '0068.HK', '0069.HK', '0070.HK', '0071.HK', '0072.HK', '0073.HK', '0074.HK', '0075.HK', '0076.HK', '0077.HK', '0078.HK', '0079.HK', '0080.HK', '0081.HK', '0082.HK', '0083.HK', '0084.HK', '0085.HK', '0086.HK', '0087.HK', '0088.HK', '0089.HK', '0090.HK', '0091.HK', '0092.HK', '0093.HK', '0094.HK', '0095.HK', '0096.HK', '0097.HK', '0098.HK', '0099.HK', '0100.HK']
+result = _fetch_weekly_bars_impl(codes)
+print('週線數據獲取結果:', result)
+"
+
+```
+python -c "
+from app.tasks.weekly_tasks import _calculate_weekly_indicators_impl
+result = _calculate_weekly_indicators_impl('HK')
+print('週線數據獲取結果:', result)
+"
+
+        logger.info("正在計算週線技術指標...")
+        result2 = _calculate_weekly_indicators_impl("HK")
+        logger.info(f"✅ 週線技術指標計算完成: {result2}")
+
+
+def oneclick_init_data(self):

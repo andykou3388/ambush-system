@@ -103,6 +103,10 @@ async def list_fundamentals():
                 "eps_ttm": float(s.eps_ttm) if s.eps_ttm else None,
                 "float_shares": s.float_shares,
                 "debt_ratio": float(s.debt_ratio) if s.debt_ratio else None,
+                "pb": float(s.pb) if s.pb else None,
+                "dividend_yield": float(s.dividend_yield) if s.dividend_yield else None,
+                "total_market_cap": float(s.total_market_cap) if s.total_market_cap else None,
+                "net_profit_ttm": float(s.net_profit_ttm) if s.net_profit_ttm else None,
                 "updated_at": str(s.updated_at) if s.updated_at else None,
             }
             for s in stocks
@@ -157,6 +161,7 @@ async def list_latest_fundamentals(
                 "pb": float(s.pb) if s.pb else None,
                 "dividend_yield": float(s.dividend_yield) if s.dividend_yield else None,
                 "total_market_cap": float(s.total_market_cap) if s.total_market_cap else None,
+                "net_profit_ttm": float(s.net_profit_ttm) if s.net_profit_ttm else None,
                 "updated_at": str(s.updated_at) if s.updated_at else None,
             }
             for s in stocks

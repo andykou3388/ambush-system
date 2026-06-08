@@ -8,6 +8,7 @@ from yfinance import Ticker
 from datetime import datetime
 import time
 import logging
+import pandas as pd
 from sqlalchemy.dialects.postgresql import insert
 from app.database import SessionLocal
 from app.models.stock_fundamental import StockFundamental
@@ -39,6 +40,66 @@ def _safe_numeric(value):
         return None
 
 
+def get_insider_net_buy_3m(ticker):
+    """
+    從 Ticker 的 insider_transactions 中計算過去 3 個月 (90天) 的內部人淨買入股數。
+    """
+    try:
+        df = ticker.insider_transactions
+        
+        # 1. 檢查數據是否存在
+        if df is None or df.empty or 'Start Date' not in df.columns:
+            return None
+
+        # 2. 確保日期格式正確
+        df['Start Date'] = pd.to_datetime(df['Start Date'], errors='coerce')
+        
+        # 3. 計算 3 個月 (90天) 前的截止時間
+        cutoff_date = pd.Timestamp.now() - pd.Timedelta(days=90)
+        
+        # 4. 篩選出過去 3 個月內的交易
+        recent_tx = df[df['Start Date'] >= cutoff_date]
+        
+        # 如果過去 3 個月沒有任何交易，淨買入為 0
+        if recent_tx.empty:
+            return 0 
+
+        net_shares = 0
+        net_value = 0
+        
+        # 5. 遍歷明細，判斷買賣方向並加總
+        for _, row in recent_tx.iterrows():
+            shares = row.get('Shares', 0)
+            value = row.get('Value', 0)
+            
+            # 處理 NaN 值
+            shares = shares if pd.notna(shares) else 0
+            value = value if pd.notna(value) else 0
+            
+            # 從 'Text' 欄位判斷交易方向 (因為 'Transaction' 欄位有時為空)
+            text = str(row.get('Text', '')).lower()
+            
+            # 定義買入與賣出的關鍵字
+            is_buy = any(kw in text for kw in ['purchase', 'acquisition', 'buy', 'grant', 'award'])
+            is_sell = any(kw in text for kw in ['sale', 'sell', 'disposition'])
+            
+            # 根據方向加減股數與金額
+            if is_buy and not is_sell:
+                net_shares += shares
+                net_value += value
+            elif is_sell and not is_buy:
+                net_shares -= shares
+                net_value -= value
+                
+        # 根據您的資料庫需求，這裡返回「淨股數」。
+        # 如果您的欄位需要的是「淨金額」，請改為 return net_value
+        return net_shares 
+
+    except Exception as e:
+        print(f"[Warning] 計算 {ticker.ticker} 內部人淨買入失敗: {e}")
+        return None
+
+
 def save_to_database(data_list: list):
     """
     批量保存基本面數據到資料庫（雙表寫入）
@@ -59,6 +120,10 @@ def save_to_database(data_list: list):
                     "float_shares": data["float_shares"],
                     "debt_ratio": data["debt_ratio"],
                     "insider_net_buy_3m": data["insider_net_buy_3m"],
+                    "pb": data["pb"],
+                    "dividend_yield": data["dividend_yield"],
+                    "total_market_cap": data["total_market_cap"],
+                    "net_profit_ttm": data["net_profit_ttm"],
                     "updated_at": data["updated_at"],
                 },
             )
@@ -75,6 +140,10 @@ def save_to_database(data_list: list):
                 "float_shares": data["float_shares"],
                 "debt_ratio": data["debt_ratio"],
                 "insider_net_buy_3m": data["insider_net_buy_3m"],
+                "pb": data["pb"],
+                "dividend_yield": data["dividend_yield"],
+                "total_market_cap": data["total_market_cap"],
+                "net_profit_ttm": data["net_profit_ttm"],
                 "updated_at": data["updated_at"],
             }
             upsert_latest = insert(StockFundamentalLatest).values(**latest_data)
@@ -147,6 +216,41 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                 else:
                     market = "US"
                 
+                # ==========================================
+                # 新增：處理您提到的 4 個特定欄位
+                # ==========================================
+                
+                # 1. pb (市淨率 Price-to-Book)
+                # 注意：如果您資料庫的 pb 其實是指「市盈率」，請改為 info.get('trailingPE')
+                pb = info.get('priceToBook') 
+                
+                # 2. dividend_yield (股息收益率)
+                # 【避坑指南】YFinance 返回的股息率有時是小數(如 0.0339)，有時是百分比(如 3.39)。
+                # 這裡做了一個安全處理：如果小於 1，我們認為它是小數並乘 100 轉為百分比；否則保持原樣。
+                # 請根據您資料庫的設計（存 3.39 還是 0.0339）來微調這行代碼。
+                div_yield_raw = info.get('dividendYield')
+                if div_yield_raw is not None:
+                    dividend_yield = (div_yield_raw * 100) if div_yield_raw < 1 else div_yield_raw
+                else:
+                    dividend_yield = None
+
+                # 3. total_market_cap (總市值)
+                total_market_cap = info.get('marketCap')
+                
+                # 4. net_profit_ttm (最近四季淨利潤 / TTM Net Income)
+                # 優先從 info 中的 netIncomeToCommon 獲取（這通常就是 TTM 數據）
+                net_profit_ttm = info.get('netIncomeToCommon')
+                
+                # 備用方案：如果 info 中沒有，則從年度財報 (income_stmt) 中獲取最新一期的 Net Income
+                if net_profit_ttm is None:
+                    try:
+                        income_stmt = ticker.income_stmt
+                        if income_stmt is not None and not income_stmt.empty:
+                            # 取第一列（最新一期）的 Net Income
+                            net_profit_ttm = income_stmt.iloc[0].get('Net Income')
+                    except Exception:
+                        pass # 如果財報也抓不到，就保持 None
+
                 fundamental_data = {
                     "code": symbol,
                     "market": market,
@@ -155,10 +259,14 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                     "eps_ttm": _safe_numeric(info.get("trailingEps")),
                     "float_shares": info.get("floatShares"),
                     "debt_ratio": debt_to_equity,
-                    "insider_net_buy_3m": info.get("insiderTransactions"),
+                    "insider_net_buy_3m": get_insider_net_buy_3m(ticker) or 0,
+                    "pb": pb,
+                    "dividend_yield": dividend_yield,
+                    "total_market_cap": total_market_cap,
+                    "net_profit_ttm": net_profit_ttm,
                     "updated_at": datetime.now(),
                 }
-                
+                print(f"獲取到 {symbol} 的基本面數據: {fundamental_data}")
                 batch_fundamental_data.append(fundamental_data)
                 success_count += 1
                 logger.info(f"成功獲取 {symbol} 的基本面數據")
@@ -240,6 +348,41 @@ def fetch_single_stock_fundamental(self, symbol: str):
         else:
             market = "US"
         
+        # ==========================================
+        # 新增：處理您提到的 4 個特定欄位
+        # ==========================================
+        
+        # 1. pb (市淨率 Price-to-Book)
+        # 注意：如果您資料庫的 pb 其實是指「市盈率」，請改為 info.get('trailingPE')
+        pb = info.get('priceToBook') 
+        
+        # 2. dividend_yield (股息收益率)
+        # 【避坑指南】YFinance 返回的股息率有時是小數(如 0.0339)，有時是百分比(如 3.39)。
+        # 這裡做了一個安全處理：如果小於 1，我們認為它是小數並乘 100 轉為百分比；否則保持原樣。
+        # 請根據您資料庫的設計（存 3.39 還是 0.0339）來微調這行代碼。
+        div_yield_raw = info.get('dividendYield')
+        if div_yield_raw is not None:
+            dividend_yield = (div_yield_raw * 100) if div_yield_raw < 1 else div_yield_raw
+        else:
+            dividend_yield = None
+
+        # 3. total_market_cap (總市值)
+        total_market_cap = info.get('marketCap')
+        
+        # 4. net_profit_ttm (最近四季淨利潤 / TTM Net Income)
+        # 優先從 info 中的 netIncomeToCommon 獲取（這通常就是 TTM 數據）
+        net_profit_ttm = info.get('netIncomeToCommon')
+        
+        # 備用方案：如果 info 中沒有，則從年度財報 (income_stmt) 中獲取最新一期的 Net Income
+        if net_profit_ttm is None:
+            try:
+                income_stmt = ticker.income_stmt
+                if income_stmt is not None and not income_stmt.empty:
+                    # 取第一列（最新一期）的 Net Income
+                    net_profit_ttm = income_stmt.iloc[0].get('Net Income')
+            except Exception:
+                pass # 如果財報也抓不到，就保持 None
+
         fundamental_data = {
             "code": symbol,
             "market": market,
@@ -248,7 +391,11 @@ def fetch_single_stock_fundamental(self, symbol: str):
             "eps_ttm": _safe_numeric(info.get("trailingEps")),
             "float_shares": info.get("floatShares"),
             "debt_ratio": debt_to_equity,
-            "insider_net_buy_3m": info.get("insiderTransactions"),
+            "insider_net_buy_3m": get_insider_net_buy_3m(ticker) or 0,
+            "pb": pb,
+            "dividend_yield": dividend_yield,
+            "total_market_cap": total_market_cap,
+            "net_profit_ttm": net_profit_ttm,
             "updated_at": datetime.now(),
         }
         

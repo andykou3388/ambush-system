@@ -17,6 +17,14 @@ class StockFundamental(Base):
     float_shares = Column(BigInteger)
     debt_ratio = Column(Numeric(6, 4))
     insider_net_buy_3m = Column(BigInteger)
+    pb = Column(Numeric(10, 4))
+    dividend_yield = Column(Numeric(8, 4))
+    total_market_cap = Column(Numeric(18, 2))
+    net_profit_ttm = Column(Numeric(18, 2))
+    pb = Column(Numeric(10, 4))
+    dividend_yield = Column(Numeric(8, 4))
+    total_market_cap = Column(Numeric(18, 2))
+    net_profit_ttm = Column(Numeric(18, 2))
     updated_at = Column(DateTime(timezone=True))
 
     __table_args__ = (

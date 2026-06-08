@@ -70,6 +70,10 @@ CREATE TABLE stock_fundamental (
     float_shares BIGINT,
     debt_ratio NUMERIC(6,4),
     insider_net_buy_3m BIGINT,
+    pb NUMERIC(10,4),
+    dividend_yield NUMERIC(8,4),
+    total_market_cap NUMERIC(18,2),
+    net_profit_ttm NUMERIC(18,2),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT uq_code_report UNIQUE(code, report_date)
 );

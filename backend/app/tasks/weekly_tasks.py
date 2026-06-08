@@ -2,8 +2,10 @@
 每週任務模組
 負責週五收盤後的技術指標計算、規則引擎執行與通知發送
 V2.0 優化：使用 stock_fundamental_latest 緩存表進行基本面查詢
+V2.0 增強：技術指標計算時過濾 NaN/Inf，避免下游 JSON 序列化失敗
 """
 import logging
+import math
 from typing import List
 
 from celery import shared_task
@@ -18,6 +20,17 @@ from app.engine.rule_engine import RuleEngine
 from classifier.zone_classifier import ThreeZoneClassifier
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or_none(v):
+    """過濾 NaN/Inf，僅保留有限值，否則回傳 None"""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else None
+    except (ValueError, TypeError):
+        return None
 
 
 def _calculate_weekly_indicators_impl(market: str = "HK"):
@@ -43,10 +56,21 @@ def _calculate_weekly_indicators_impl(market: str = "HK"):
         results = []
         for code in codes:
             try:
-                # 讀取最近 60 筆週線數據
-                bars = db.query(StockBar).filter(
-                    StockBar.code == code
-                ).order_by(StockBar.trade_date.desc()).limit(60).all()
+                # 讀取最近 60 筆週線數據（包含所有分區表）
+                # 使用原生SQL查詢所有分區表，確保涵蓋所有年份
+                from sqlalchemy import text
+                sql_query = text("""
+                    SELECT id, code, name, market, trade_date, freq, open, high, low, close, volume, 
+                           change_pct, ma10_w, ma30_w, volume_ma5_w, created_at 
+                    FROM stock_bar 
+                    WHERE code = :code 
+                    ORDER BY trade_date DESC 
+                    LIMIT 60
+                """)
+                bars = db.execute(sql_query, {"code": code}).fetchall()
+                
+                # 轉換為 StockBar 對象以便處理
+                bars = [StockBar(**row._asdict()) for row in bars]
                 
                 if not bars:
                     continue
@@ -61,7 +85,12 @@ def _calculate_weekly_indicators_impl(market: str = "HK"):
                 ma10 = sum(closes[:10]) / 10 if len(closes) >= 10 else closes[-1]
                 ma30 = sum(closes[:30]) / 30 if len(closes) >= 30 else closes[-1]
                 vol_ma5 = sum(volumes[:5]) / 5 if len(volumes) >= 5 else volumes[-1] if volumes else 0
-                
+
+                # 過濾 NaN/Inf，僅寫入有限值
+                ma10 = _finite_or_none(ma10)
+                ma30 = _finite_or_none(ma30)
+                vol_ma5 = _finite_or_none(vol_ma5)
+
                 # 更新最新一筆
                 latest_bar = bars[0]
                 latest_bar.ma10_w = ma10
@@ -70,8 +99,8 @@ def _calculate_weekly_indicators_impl(market: str = "HK"):
                 
                 results.append({
                     "code": code,
-                    "ma10": round(ma10, 2),
-                    "ma30": round(ma30, 2),
+                    "ma10": round(ma10, 2) if ma10 is not None else None,
+                    "ma30": round(ma30, 2) if ma30 is not None else None,
                     "status": "success",
                 })
                 
@@ -128,13 +157,24 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
         
         for code in codes:
             try:
-                # 讀取最新行情
-                bar = db.query(StockBar).filter(
-                    StockBar.code == code
-                ).order_by(StockBar.trade_date.desc()).first()
+                # 讀取最新行情（包含所有分區表）
+                # 使用原生SQL查詢所有分區表，確保涵蓋所有年份
+                from sqlalchemy import text
+                sql_query = text("""
+                    SELECT id, code, name, market, trade_date, freq, open, high, low, close, volume, 
+                           change_pct, ma10_w, ma30_w, volume_ma5_w, created_at 
+                    FROM stock_bar 
+                    WHERE code = :code 
+                    ORDER BY trade_date DESC 
+                    LIMIT 1
+                """)
+                bar_result = db.execute(sql_query, {"code": code}).fetchone()
                 
-                if not bar:
+                if not bar_result:
                     continue
+                
+                # 轉換為 StockBar 對象
+                bar = StockBar(**bar_result._asdict())
                 
                 # 讀取最新基本面（使用 latest 緩存表）
                 fund = db.query(StockFundamentalLatest).filter(
@@ -147,14 +187,14 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
                 # 執行三區分類
                 # 規則引擎標籤 → 三區對應：
                 #   UPTREND   : 上升交易（买点）— 強勢買入信號
-                #   POTENTIAL : 潜在实力股（观察）/ 观望 — 持有或觀察（靠信心度區分）
+                #   POTENTIAL : 潛在实力股（观察）/ 觀望 — 持有或觀察（靠信心度區分）
                 #   DOWNTREND : 下跌参考（警示）— 風險警示
-                label = rule_result.get("label", "观望")
+                label = rule_result.get("label", "觀望")
                 zone_map = {
                     "上升交易（买点）": "UPTREND",
                     "潜在实力股（观察）": "POTENTIAL",
                     "下跌参考（警示）": "DOWNTREND",
-                    "观望": "POTENTIAL",
+                    "觀望": "POTENTIAL",
                 }
                 zone = zone_map.get(label, "POTENTIAL")
                 

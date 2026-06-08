@@ -2,6 +2,7 @@
 篩選器 API Router
 提供股票篩選和批量查詢功能
 """
+import math
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Query, Depends, HTTPException
@@ -13,6 +14,20 @@ from app.models.stock_bar import StockBar
 from app.models.stock_signal_log import StockSignalLog
 
 router = APIRouter(prefix="/api/v1/screener", tags=["screener"])
+
+
+def _safe_float(v) -> float:
+    """
+    安全轉換為 float，避免 NaN / Infinity 導致 json.dumps 拋出
+    'ValueError: Out of range float values are not JSON compliant'
+    """
+    if v is None:
+        return 0.0
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else 0.0
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def get_latest_trade_date(db: Session, days: int = 14):
@@ -98,12 +113,12 @@ async def screen_stocks(
                 "symbol": r.code,
                 "name": r.name or "",
                 "market": r.market,
-                "price": float(r.close) if r.close else 0,
-                "changePct": float(r.change_pct) if r.change_pct else 0,
+                "price": _safe_float(r.close),
+                "changePct": _safe_float(r.change_pct),
                 "zone": r.zone,
-                "ma10": float(r.ma10_w) if r.ma10_w else 0,
-                "ma30": float(r.ma30_w) if r.ma30_w else 0,
-                "score": float(r.confidence) if r.confidence else 0,
+                "ma10": _safe_float(r.ma10_w),
+                "ma30": _safe_float(r.ma30_w),
+                "score": _safe_float(r.confidence),
                 "tradeDate": str(r.trade_date) if r.trade_date else "",
             }
             for r in items
@@ -171,12 +186,12 @@ async def batch_get_stocks(
             "symbol": r.code,
             "name": r.name or "",
             "market": r.market,
-            "price": float(r.close) if r.close else 0,
-            "changePct": float(r.change_pct) if r.change_pct else 0,
+            "price": _safe_float(r.close),
+            "changePct": _safe_float(r.change_pct),
             "zone": r.zone,
-            "ma10": float(r.ma10_w) if r.ma10_w else 0,
-            "ma30": float(r.ma30_w) if r.ma30_w else 0,
-            "score": float(r.confidence) if r.confidence else 0,
+            "ma10": _safe_float(r.ma10_w),
+            "ma30": _safe_float(r.ma30_w),
+            "score": _safe_float(r.confidence),
             "tradeDate": str(r.trade_date) if r.trade_date else "",
         }
         for r in items
