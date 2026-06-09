@@ -158,6 +158,20 @@ codes = ['0001.HK', '0003.HK', '0005.HK', '0006.HK', '0007.HK', '0008.HK', '0009
 result = _fetch_weekly_bars_impl(codes)
 print('週線數據獲取結果:', result)
 "
+python -c "
+from app.tasks.oneclick_init_task import _fetch_weekly_bars_impl
+# 使用您之前提供的股票代碼列表
+codes = ['0001.HK']
+result = _fetch_weekly_bars_impl(codes)
+print('週線數據獲取結果:', result)
+"
+python -c "
+from app.tasks.oneclick_init_task import _run_weekly_rule_engine_impl
+# 使用您之前提供的股票代碼列表
+result =_run_weekly_rule_engine_impl('HK')
+print('週線數據獲取結果:', result)
+"
+        result3 = _run_weekly_rule_engine_impl("HK")
 
 ```
 python -c "
@@ -165,6 +179,13 @@ from app.tasks.weekly_tasks import _calculate_weekly_indicators_impl
 result = _calculate_weekly_indicators_impl('HK')
 print('週線數據獲取結果:', result)
 "
+
+python -c "
+from app.tasks.weekly_tasks import _calculate_weekly_indicators_cust
+result = _calculate_weekly_indicators_cust('HK')
+print('週線數據獲取結果:', result)
+"
+
 
         logger.info("正在計算週線技術指標...")
         result2 = _calculate_weekly_indicators_impl("HK")

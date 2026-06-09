@@ -34,6 +34,7 @@ CREATE TABLE stock_bar (
 ) PARTITION BY RANGE (trade_date);
 
 -- 按年分區
+CREATE TABLE stock_bar_2024 PARTITION OF stock_bar FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
 CREATE TABLE stock_bar_2025 PARTITION OF stock_bar FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
 CREATE TABLE stock_bar_2026 PARTITION OF stock_bar FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
 CREATE TABLE stock_bar_2027 PARTITION OF stock_bar FOR VALUES FROM ('2027-01-01') TO ('2028-01-01');
@@ -109,6 +110,7 @@ CREATE TABLE stock_signal_log (
     PRIMARY KEY (id, trade_date)
 ) PARTITION BY RANGE (trade_date);
 
+CREATE TABLE stock_signal_log_2024 PARTITION OF stock_signal_log FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
 CREATE TABLE stock_signal_log_2025 PARTITION OF stock_signal_log FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
 CREATE TABLE stock_signal_log_2026 PARTITION OF stock_signal_log FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
 CREATE TABLE stock_signal_log_2027 PARTITION OF stock_signal_log FOR VALUES FROM ('2027-01-01') TO ('2028-01-01');

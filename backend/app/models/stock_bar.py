@@ -19,6 +19,7 @@ class StockBar(Base):
     low = Column(Numeric(15, 4))
     close = Column(Numeric(15, 4))
     volume = Column(BigInteger)
+    amount = Column(BigInteger)
     change_pct = Column(Numeric(6, 2))
     ma10_w = Column(Numeric(15, 4))
     ma30_w = Column(Numeric(15, 4))

@@ -7,7 +7,9 @@
 import time
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
+import talib
 import yfinance as yf
 from celery import shared_task
 from celery.utils.log import get_task_logger
@@ -54,15 +56,25 @@ def _fetch_weekly_bars_impl(stock_codes: list):
 
                 # 下載近 1 年的週線數據
                 ticker = yf.Ticker(symbol)
-                hist = ticker.history(period="1y", interval="1wk")
+                hist = ticker.history(period="2y", interval="1wk")
 
                 if hist.empty:
                     logger.warning(f"{symbol} 無週線數據")
                     failed_symbols.append(symbol)
                     continue
 
+                # 使用 TA-Lib 計算 MA10、MA30 和 Volume MA5
+                close_array = hist["Close"].values.astype(float)
+                volume_array = hist["Volume"].values.astype(float)
+                ma10_all = talib.MA(close_array, timeperiod=10) if len(close_array) >= 10 else None
+                ma30_all = talib.MA(close_array, timeperiod=30) if len(close_array) >= 30 else None
+                vol_ma5_all = talib.MA(volume_array, timeperiod=5) if len(volume_array) >= 5 else None
+
+                # 計算 change_pct（漲跌幅），第一筆為 None
+                prev_close = None
+
                 bars_saved = 0
-                for trade_date, row in hist.iterrows():
+                for i, (trade_date, row) in enumerate(hist.iterrows()):
                     # 安全取得 volume，處理 NaN 和各種類型
                     raw_vol = row.get("Volume", 0)
                     try:
@@ -72,6 +84,29 @@ def _fetch_weekly_bars_impl(stock_codes: list):
                             volume = int(float(raw_vol))
                     except (ValueError, TypeError):
                         volume = 0
+
+                    # 計算成交金額 amount = close * volume
+                    current_close = float(row["Close"])
+                    amount = int(round(current_close * volume)) if volume > 0 else 0
+
+                    # 安全取得 MA 值（TA-Lib 前 N-1 筆為 NaN）
+                    ma10_val = None
+                    ma30_val = None
+                    if ma10_all is not None and i < len(ma10_all) and not np.isnan(ma10_all[i]):
+                        ma10_val = round(float(ma10_all[i]), 4)
+                    if ma30_all is not None and i < len(ma30_all) and not np.isnan(ma30_all[i]):
+                        ma30_val = round(float(ma30_all[i]), 4)
+
+                    # 安全取得 Volume MA5 值
+                    vol_ma5_val = None
+                    if vol_ma5_all is not None and i < len(vol_ma5_all) and not np.isnan(vol_ma5_all[i]):
+                        vol_ma5_val = round(float(vol_ma5_all[i]), 4)
+
+                    # 計算 change_pct（漲跌幅 %）
+                    change_pct = None
+                    if prev_close is not None and prev_close != 0:
+                        change_pct = round((current_close - prev_close) / prev_close * 100, 2)
+                    prev_close = current_close
 
                     # 使用 UTC 時間避免時區問題
                     now_utc = datetime.now(timezone.utc)
@@ -86,6 +121,11 @@ def _fetch_weekly_bars_impl(stock_codes: list):
                         "low": round(float(row["Low"]), 4),
                         "close": round(float(row["Close"]), 4),
                         "volume": volume,
+                        "amount": amount,
+                        "change_pct": change_pct,
+                        "ma10_w": ma10_val,
+                        "ma30_w": ma30_val,
+                        "volume_ma5_w": vol_ma5_val,
                         "created_at": now_utc,
                     }
 
@@ -98,6 +138,11 @@ def _fetch_weekly_bars_impl(stock_codes: list):
                             "low": bar_data["low"],
                             "close": bar_data["close"],
                             "volume": bar_data["volume"],
+                            "amount": bar_data["amount"],
+                            "change_pct": bar_data["change_pct"],
+                            "ma10_w": bar_data["ma10_w"],
+                            "ma30_w": bar_data["ma30_w"],
+                            "volume_ma5_w": bar_data["volume_ma5_w"],
                             "created_at": bar_data["created_at"],
                         },
                     )
@@ -105,9 +150,18 @@ def _fetch_weekly_bars_impl(stock_codes: list):
                     bars_saved += 1
 
                 success_count += 1
-                logger.info(f"成功獲取 {symbol} 的 {bars_saved} 筆週線數據")
+                # 取得最新一筆的 MA 值用於返回結果
+                latest_ma10 = None
+                latest_ma30 = None
+                if ma10_all is not None and not np.isnan(ma10_all[-1]):
+                    latest_ma10 = round(float(ma10_all[-1]), 2)
+                if ma30_all is not None and not np.isnan(ma30_all[-1]):
+                    latest_ma30 = round(float(ma30_all[-1]), 2)
+                print(f"成功獲取 {symbol} 的 {bars_saved} 筆週線數據 (MA10={latest_ma10}, MA30={latest_ma30})")
+                logger.info(f"成功獲取 {symbol} 的 {bars_saved} 筆週線數據 (MA10={latest_ma10}, MA30={latest_ma30})")
 
             except Exception as e:
+                print(f"獲取 {symbol} 週線數據失敗: {e}")
                 logger.error(f"獲取 {symbol} 週線數據失敗: {e}", exc_info=True)
                 failed_symbols.append(symbol)
                 continue
@@ -210,10 +264,10 @@ def oneclick_init_data(self):
         result_weekly = _fetch_weekly_bars_impl(stock_codes)
         logger.info(f"✅ 週線 K 線數據獲取完成: {result_weekly}")
         
-        # 4. 執行週線技術指標計算（直接調用函數）
-        logger.info("正在計算週線技術指標...")
-        result2 = _calculate_weekly_indicators_impl("HK")
-        logger.info(f"✅ 週線技術指標計算完成: {result2}")
+        # # 4. 執行週線技術指標計算（直接調用函數）
+        # logger.info("正在計算週線技術指標...")
+        # result2 = _calculate_weekly_indicators_impl("HK")
+        # logger.info(f"✅ 週線技術指標計算完成: {result2}")
         
         # 5. 執行規則引擎分析（直接調用函數）
         logger.info("正在執行規則引擎分析...")

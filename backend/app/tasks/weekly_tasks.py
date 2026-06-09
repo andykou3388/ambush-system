@@ -148,7 +148,8 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
             func.upper(StockBar.market) == market
         ).distinct().all()
         
-        codes = [s.code for s in stocks]
+        # codes = [s.code for s in stocks]
+        codes = ['0001.HK', '0002.HK', '0003.HK']  # 測試用，實際使用時請註釋掉這行
         logger.info(f"需要執行 {len(codes)} 隻股票的規則引擎")
         
         engine = RuleEngine()
@@ -175,7 +176,7 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
                 
                 # 轉換為 StockBar 對象
                 bar = StockBar(**bar_result._asdict())
-                
+   
                 # 讀取最新基本面（使用 latest 緩存表）
                 fund = db.query(StockFundamentalLatest).filter(
                     StockFundamentalLatest.code == code
@@ -183,7 +184,7 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
                 
                 # 執行規則引擎
                 rule_result = engine.run_from_db(bar, fund)
-                
+           
                 # 執行三區分類
                 # 規則引擎標籤 → 三區對應：
                 #   UPTREND   : 上升交易（买点）— 強勢買入信號
