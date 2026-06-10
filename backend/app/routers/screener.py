@@ -12,6 +12,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.stock_bar import StockBar
 from app.models.stock_signal_log import StockSignalLog
+from app.models.stock_fundamental_latest import StockFundamentalLatest
 
 router = APIRouter(prefix="/api/v1/screener", tags=["screener"])
 
@@ -158,11 +159,21 @@ async def batch_get_stocks(
             StockSignalLog.confidence,
             StockSignalLog.trigger_rules,
             StockSignalLog.trade_date,
+            StockFundamentalLatest.pe_ttm,
+            StockFundamentalLatest.eps_ttm,
+            StockFundamentalLatest.total_market_cap,
+            StockFundamentalLatest.insider_net_buy_3m,
+            StockFundamentalLatest.updated_at,
         )
         .join(
             StockSignalLog,
             (StockBar.code == StockSignalLog.code)
             & (StockBar.trade_date == StockSignalLog.trade_date),
+        )
+        .join(
+            StockFundamentalLatest,
+            StockBar.code == StockFundamentalLatest.code,
+            isouter=True,
         )
         .filter(StockSignalLog.trade_date >= cutoff_date)
     )
@@ -193,6 +204,16 @@ async def batch_get_stocks(
             "ma30": _safe_float(r.ma30_w),
             "score": _safe_float(r.confidence),
             "tradeDate": str(r.trade_date) if r.trade_date else "",
+            "pe": _safe_float(r.pe_ttm) if r.pe_ttm is not None else 0,
+            "eps": f"{_safe_float(r.eps_ttm)}%" if r.eps_ttm is not None else "0%",
+            "mktCap": f"{_safe_float(r.total_market_cap)}億" if r.total_market_cap is not None else "0億",
+            "insider": str(r.insider_net_buy_3m) if r.insider_net_buy_3m is not None else "無異動",
+            "lastUpdate": str(r.updated_at) if r.updated_at else str(r.trade_date),
+            "volChange": _safe_float(r.volume_ma5_w),
+            "signals": [],
+            "rules": [],
+            "suggestion": "請查看詳細資訊",
+            "topic": "未定義",
         }
         for r in items
     ]

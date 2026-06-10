@@ -87,7 +87,7 @@ async function fetchStocks() {
         ma10: stock.ma10,
         ma30: stock.ma30,
         score: stock.score,
-        pe: stock.score,
+        pe: stock.pe,
         volChange: stock.volChange || 0,
         eps: stock.eps || '0%',
         mktCap: stock.mktCap || '0億',
