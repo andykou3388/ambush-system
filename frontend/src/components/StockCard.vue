@@ -31,16 +31,16 @@
         <span class="mono font-bold text-slate-200">{{ stock.pe }}</span>
       </div>
       <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
+        <span class="text-slate-500">信心度</span>
+        <span class="mono font-bold" :class="confidenceClass">{{ (stock.confidence * 100).toFixed(0) }}%</span>
+      </div>
+      <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
         <span class="text-slate-500">10W MA</span>
         <span class="mono font-bold text-slate-200">{{ stock.ma10.toFixed(1) }}</span>
       </div>
       <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
         <span class="text-slate-500">周量變幅</span>
         <span class="mono font-bold" :class="stock.volChange > 100 ? 'text-green-400' : 'text-slate-200'">{{ stock.volChange }}%</span>
-      </div>
-      <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
-        <span class="text-slate-500">EPS 增長</span>
-        <span class="mono font-bold text-slate-200">{{ stock.eps }}</span>
       </div>
     </div>
 
@@ -84,6 +84,13 @@ const changeClass = computed(() => ({
   'text-green-400': props.stock.changePct >= 0,
   'text-red-400': props.stock.changePct < 0
 }))
+
+const confidenceClass = computed(() => {
+  const conf = props.stock.confidence || 0
+  if (conf >= 0.8) return 'text-green-400'      // 高信心 (≥80%)
+  if (conf >= 0.6) return 'text-blue-400'       // 中信心 (60%-79%)
+  return 'text-yellow-400'                      // 低信心 (<60%)
+})
 
 function goToDetail() {
   router.push(`/stocks/${props.stock.symbol}`)

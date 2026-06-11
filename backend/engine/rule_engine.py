@@ -132,7 +132,7 @@ class RuleEngine:
         r3 = self.evaluate_rule3(row)
         r4 = self.evaluate_rule4(row)
         r5 = self.evaluate_rule5(row)
-
+        
         # 分類
         label = self.classify(r1, r2, r3, r4, r5)
 

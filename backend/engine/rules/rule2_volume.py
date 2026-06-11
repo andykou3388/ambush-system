@@ -28,4 +28,5 @@ class Rule2Volume:
             return False
 
         ratio = float(self.cfg["volume_boost_ratio"])
+        #print(f"Evaluating Volume Rule: current={vol_current}, ma5={vol_ma5}, ratio={ratio}")
         return vol_current >= vol_ma5 * ratio

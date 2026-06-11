@@ -148,8 +148,8 @@ def _run_weekly_rule_engine_impl(market: str = "TW"):
             func.upper(StockBar.market) == market
         ).distinct().all()
         
-        # codes = [s.code for s in stocks]
-        codes = ['0001.HK', '0002.HK', '0003.HK']  # 測試用，實際使用時請註釋掉這行
+        codes = [s.code for s in stocks]
+        #codes = ['0001.HK', '0002.HK', '0003.HK']  # 測試用，實際使用時請註釋掉這行
         logger.info(f"需要執行 {len(codes)} 隻股票的規則引擎")
         
         engine = RuleEngine()

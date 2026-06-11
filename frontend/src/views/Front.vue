@@ -36,6 +36,7 @@ const activeTab = ref('up')
 const selectedStock = ref(null)
 const chartInitialized = ref(false)
 const stocks = ref([])
+const sortOrder = ref('desc') // 'asc' or 'desc'
 const stats = ref({
   upZone: { title: '交易區 (上升趨勢)', value: 0, unit: '只', color: 'green', description: '' },
   downZone: { title: '避雷區 (下跌警示)', value: 0, unit: '只', color: 'red', description: '' },
@@ -90,13 +91,14 @@ async function fetchStocks() {
         pe: stock.pe,
         volChange: stock.volChange || 0,
         eps: stock.eps || '0%',
-        mktCap: stock.mktCap || '0億',
+        mktCap: stock.mktCap || '0 億',
         insider: stock.insider || '無異動',
         topic: stock.topic || '未定義',
         lastUpdate: stock.lastUpdate || '',
         signals: stock.signals || [],
         rules: stock.rules || [],
-        suggestion: stock.suggestion || '請查看詳細資訊'
+        suggestion: stock.suggestion || '請查看詳細資訊',
+        confidence: stock.confidence || 0  // 信心度 (0-1)
       }
     })
   } catch (error) {
@@ -169,10 +171,22 @@ onMounted(async () => {
 
 // 計算屬性：按區域篩選的股票
 const filteredStocks = computed(() => {
-  return stocks.value.filter(s => s.zone === activeTab.value)
+  let result = stocks.value.filter(s => s.zone === activeTab.value)
+  // 加入排序
+  return result.sort((a, b) => {
+    if (sortOrder.value === 'desc') {
+      return b.confidence - a.confidence
+    } else {
+      return a.confidence - b.confidence
+    }
+  })
 })
 
 // Methods
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+}
+
 function openStockDetail(stock) {
   selectedStock.value = stock
   chartInitialized.value = false
@@ -345,6 +359,18 @@ function initChart(stock) {
       <label class="flex items-center gap-1.5 px-2 py-1 rounded border border-trading-border bg-slate-800/50 text-xs cursor-pointer hover:border-slate-600">
         <input type="checkbox" class="accent-blue-500"> 流通盤 < 800萬
       </label>
+    </div>
+
+    <!-- Sort Control -->
+    <div class="flex justify-end mb-4">
+      <button 
+        @click="toggleSortOrder" 
+        class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded border border-slate-600 flex items-center gap-1"
+      >
+        <i class="ph-bold ph-arrow-up" v-if="sortOrder === 'desc'"></i>
+        <i class="ph-bold ph-arrow-down" v-else></i>
+        信心度排序
+      </button>
     </div>
 
     <!-- Stock List with Zone Panels (Tab based) -->

@@ -12,7 +12,7 @@ trend:
 
 # 第2层：量能与突破规则
 volume:
-  volume_boost_ratio: 5.0       # 放量 >= 5倍
+  volume_boost_ratio: 1.5       # 放量 >= 5倍
   volume_boost_duration: 1      # 当周放量
   breakout_confirm: 1           # 突破底部确认
 
@@ -24,9 +24,9 @@ buy_point:
 
 # 第4层：价格与估值
 price_valuation:
-  max_price: 15.0               # 股价<15元
-  max_pe: 10.0                  # PE<10倍
-  max_market_cap: 5000000000    # 市值<50亿
+  max_price: 100.0               # 股价<100元
+  max_pe: 40.0                  # PE<10倍
+  max_market_cap: 5000000000000    # 市值<50亿
 
 # 第5层：基本面辅助
 fundamental:

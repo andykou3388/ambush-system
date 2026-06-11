@@ -40,4 +40,6 @@ class Rule4Valuation:
         else:
             cond3 = float(market_cap) < float(price_cfg["max_market_cap"])
 
+        #print(f"Evaluating Price Valuation Rule: price={close}, pe={pe}, market_cap={market_cap}, cond1={cond1}, cond2={cond2}, cond3={cond3}")
+
         return cond1 and cond2 and cond3

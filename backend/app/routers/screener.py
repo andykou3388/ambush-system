@@ -132,7 +132,7 @@ async def batch_get_stocks(
     symbols: Optional[str] = Query(None, description="股票代碼列表，逗號分隔"),
     zone: Optional[str] = Query(None, description="區域過濾"),
     market: Optional[str] = Query(None, description="市場 (TW/US)"),
-    days: int = Query(14, ge=1, le=365, description="查詢最近 N 天的資料"),
+    days: int = Query(1, ge=1, le=365, description="查詢最近 N 天的資料"),
     db: Session = Depends(get_db),
 ):
     """
@@ -202,18 +202,19 @@ async def batch_get_stocks(
             "zone": r.zone,
             "ma10": _safe_float(r.ma10_w),
             "ma30": _safe_float(r.ma30_w),
-            "score": _safe_float(r.confidence),
-            "tradeDate": str(r.trade_date) if r.trade_date else "",
-            "pe": _safe_float(r.pe_ttm) if r.pe_ttm is not None else 0,
-            "eps": f"{_safe_float(r.eps_ttm)}%" if r.eps_ttm is not None else "0%",
-            "mktCap": f"{_safe_float(r.total_market_cap)}億" if r.total_market_cap is not None else "0億",
-            "insider": str(r.insider_net_buy_3m) if r.insider_net_buy_3m is not None else "無異動",
-            "lastUpdate": str(r.updated_at) if r.updated_at else str(r.trade_date),
-            "volChange": _safe_float(r.volume_ma5_w),
-            "signals": [],
-            "rules": [],
-            "suggestion": "請查看詳細資訊",
-            "topic": "未定義",
+             "score": _safe_float(r.confidence),
+             "tradeDate": str(r.trade_date) if r.trade_date else "",
+             "pe": _safe_float(r.pe_ttm) if r.pe_ttm is not None else 0,
+             "eps": f"{_safe_float(r.eps_ttm)}%" if r.eps_ttm is not None else "0%",
+             "mktCap": f"{_safe_float(r.total_market_cap)}億" if r.total_market_cap is not None else "0億",
+             "insider": str(r.insider_net_buy_3m) if r.insider_net_buy_3m is not None else "無異動",
+             "lastUpdate": str(r.updated_at) if r.updated_at else str(r.trade_date),
+             "volChange": _safe_float(r.volume_ma5_w),
+             "signals": [],
+             "rules": [],
+             "suggestion": "請查看詳細資訊",
+             "topic": "未定義",
+             "confidence": _safe_float(r.confidence),  # 新增：信心度字段
         }
         for r in items
     ]
