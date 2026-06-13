@@ -132,7 +132,7 @@ async def batch_get_stocks(
     symbols: Optional[str] = Query(None, description="股票代碼列表，逗號分隔"),
     zone: Optional[str] = Query(None, description="區域過濾"),
     market: Optional[str] = Query(None, description="市場 (TW/US)"),
-    days: int = Query(1, ge=1, le=365, description="查詢最近 N 天的資料"),
+    days: int = Query(14, ge=1, le=365, description="查詢最近 N 天的資料"),
     db: Session = Depends(get_db),
 ):
     """
