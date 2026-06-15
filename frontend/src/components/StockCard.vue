@@ -40,7 +40,7 @@
       </div>
       <div class="flex justify-between px-2 py-1 rounded bg-slate-800/30">
         <span class="text-slate-500">周量變幅</span>
-        <span class="mono font-bold" :class="stock.volChange > 100 ? 'text-green-400' : 'text-slate-200'">{{ stock.volChange }}%</span>
+        <span class="mono font-bold" :class="stock.volChange > 100 ? 'text-green-400' : 'text-slate-200'">{{ (stock.volChange || 0).toFixed(2) }}%</span>
       </div>
     </div>
 
@@ -72,6 +72,8 @@ const props = defineProps({
   stock: { type: Object, required: true }
 })
 
+const emit = defineEmits(['open'])
+
 const router = useRouter()
 
 const zoneBadgeClass = computed(() => ({
@@ -93,6 +95,6 @@ const confidenceClass = computed(() => {
 })
 
 function goToDetail() {
-  router.push(`/stocks/${props.stock.symbol}`)
+  emit('open', props.stock)
 }
 </script>

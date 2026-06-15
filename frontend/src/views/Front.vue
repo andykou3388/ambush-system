@@ -379,6 +379,7 @@ function initChart(stock) {
         :zone="activeTab"
         :title="tabs.find(t => t.id === activeTab).label"
         :stocks="filteredStocks"
+        @open="openStockDetail"
       />
     </div>
 

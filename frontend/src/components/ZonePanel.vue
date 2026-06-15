@@ -7,12 +7,14 @@
     <div v-if="stocks.length === 0" class="text-center py-8 text-slate-500 text-xs">
       暫無股票
     </div>
-    <StockCardList v-else :stocks="stocks" />
+    <StockCardList v-else :stocks="stocks" @open="$emit('open', $event)" />
   </div>
 </template>
 
 <script setup>
 import StockCardList from './StockCardList.vue'
+
+const emit = defineEmits(['open'])
 
 defineProps({
   zone: { type: String, required: true },

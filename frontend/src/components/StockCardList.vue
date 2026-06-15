@@ -1,10 +1,11 @@
 <template>
   <div class="stock-card-list">
-    <StockCard 
-      v-for="stock in stocks" 
-      :key="stock.symbol" 
-      :stock="stock" 
-    />
+      <StockCard 
+        v-for="stock in stocks" 
+        :key="stock.symbol" 
+        :stock="stock" 
+        @open="$emit('open', $event)"
+      />
     <div v-if="stocks.length === 0" class="empty-state">
       暫無股票數據
     </div>
@@ -13,6 +14,8 @@
 
 <script setup>
 import StockCard from './StockCard.vue'
+
+const emit = defineEmits(['open'])
 
 defineProps({
   stocks: { type: Array, default: () => [] }

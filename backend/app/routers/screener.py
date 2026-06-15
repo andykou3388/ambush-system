@@ -31,6 +31,23 @@ def _safe_float(v) -> float:
         return 0.0
 
 
+def _vol_change_percent(volume, volume_ma5_w) -> float:
+    """
+    計算周量變幅百分比：
+    (volume - volume_ma5_w) / volume_ma5_w * 100
+    返回 0.0 當無效或除以零。
+    """
+    try:
+        vol = float(volume) if volume is not None else 0.0
+        ma5 = float(volume_ma5_w) if volume_ma5_w is not None else 0.0
+        if ma5 == 0:
+            return 0.0
+        val = (vol - ma5) / ma5 * 100.0
+        return val if math.isfinite(val) else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def get_latest_trade_date(db: Session, days: int = 14):
     cutoff = date.today() - timedelta(days=days)
     return (
@@ -71,6 +88,7 @@ async def screen_stocks(
             StockBar.change_pct,
             StockBar.ma10_w,
             StockBar.ma30_w,
+            StockBar.volume,
             StockBar.volume_ma5_w,
             StockSignalLog.zone,
             StockSignalLog.confidence,
@@ -154,6 +172,7 @@ async def batch_get_stocks(
             StockBar.change_pct,
             StockBar.ma10_w,
             StockBar.ma30_w,
+            StockBar.volume,
             StockBar.volume_ma5_w,
             StockSignalLog.zone,
             StockSignalLog.confidence,
@@ -209,7 +228,7 @@ async def batch_get_stocks(
              "mktCap": f"{_safe_float(r.total_market_cap)}億" if r.total_market_cap is not None else "0億",
              "insider": str(r.insider_net_buy_3m) if r.insider_net_buy_3m is not None else "無異動",
              "lastUpdate": str(r.updated_at) if r.updated_at else str(r.trade_date),
-             "volChange": _safe_float(r.volume_ma5_w),
+                "volChange": round(_safe_float(_vol_change_percent(r.volume, r.volume_ma5_w)), 2),
              "signals": [],
              "rules": [],
              "suggestion": "請查看詳細資訊",
