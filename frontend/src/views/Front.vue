@@ -201,32 +201,51 @@ function closeModal() {
   chartInitialized.value = false
 }
 
-function initChart(stock) {
+async function fetchStockBars(symbol) {
+  try {
+    const response = await fetch(`/api/v1/stocks/${symbol}/bars?freq=W&weeks=52`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+    return data.bars || []
+  } catch (error) {
+    console.error(`Failed to fetch bars for ${symbol}:`, error)
+    return []
+  }
+}
+
+async function initChart(stock) {
   const canvas = document.getElementById('stockChart')
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
   
-  // Mock Weekly Data generation
-  const labels = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12']
-  let priceData = []
-  let ma10Data = []
-  let ma30Data = []
+  // Fetch real weekly bar data from API
+  const bars = await fetchStockBars(stock.symbol)
   
-  let p = stock.price * 0.8
-  for (let i = 0; i < 12; i++) {
-    p = p + (Math.random() - 0.45) * (stock.price * 0.05)
-    priceData.push(p)
+  if (bars.length === 0) {
+    console.warn('No bar data available, using fallback')
+    chartInitialized.value = true
+    return
   }
-  priceData[11] = stock.price
   
-  for (let i = 0; i < 12; i++) {
-    let base = stock.zone === 'up' ? stock.price * 0.95 : stock.price * 1.1
-    ma10Data.push(base + Math.random() * 0.5)
-    
-    let base30 = stock.zone === 'up' ? stock.price * 0.85 : stock.price * 1.3
-    ma30Data.push(base30 + Math.random() * 0.5)
-  }
+  // Extract data arrays from bars
+  const labels = bars.map(bar => {
+    const date = new Date(bar.date)
+    return `${date.getMonth() + 1}/${date.getDate()}`
+  })
+  
+  const priceData = bars.map(bar => parseFloat(bar.close))
+  const ma10Data = bars.map(bar => bar.ma10 ? parseFloat(bar.ma10) : null)
+  const ma30Data = bars.map(bar => bar.ma30 ? parseFloat(bar.ma30) : null)
+  
+  // Limit to last 52 weeks for display
+  const maxWeeks = 52
+  const displayLabels = labels.slice(-maxWeeks)
+  const displayPriceData = priceData.slice(-maxWeeks)
+  const displayMa10Data = ma10Data.slice(-maxWeeks)
+  const displayMa30Data = ma30Data.slice(-maxWeeks)
 
   // Destroy existing chart if any
   if (window.currentChart) window.currentChart.destroy()
@@ -234,11 +253,11 @@ function initChart(stock) {
   window.currentChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels,
+      labels: displayLabels,
       datasets: [
         {
           label: '周收盤價',
-          data: priceData,
+          data: displayPriceData,
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           borderWidth: 2,
@@ -248,8 +267,8 @@ function initChart(stock) {
           fill: true
         },
         {
-          label: '10周均線 (神奇支撐)',
-          data: ma10Data,
+          label: '10 周均線 (神奇支撐)',
+          data: displayMa10Data,
           borderColor: '#f59e0b',
           borderWidth: 1.5,
           borderDash: [4, 4],
@@ -257,8 +276,8 @@ function initChart(stock) {
           tension: 0.3
         },
         {
-          label: '30周均線 (趨勢錨點)',
-          data: ma30Data,
+          label: '30 周均線 (趨勢錨點)',
+          data: displayMa30Data,
           borderColor: '#64748b',
           borderWidth: 1,
           pointRadius: 0,

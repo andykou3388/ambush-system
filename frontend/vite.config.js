@@ -10,6 +10,10 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    watch: {
+      usePolling: true,  // 使用輪詢方式監控文件變化（解決 Windows volume 問題）
+      interval: 1000
+    },
     proxy: {
       '/api': {
         target: 'http://backend:8000',

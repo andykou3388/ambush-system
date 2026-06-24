@@ -1,10 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Depends
 from app.models.stock_detail import StockDetailResponse
+from app.models.stock_bar import StockBar
 from app.indicators.ta_lib_calculator import TALibCalculator
 from app.engine.rule_engine import RuleEngine
 from app.classifier.zone_classifier import ThreeZoneClassifier
+from app.database import get_db
 import pandas as pd
 import numpy as np
+from sqlalchemy.orm import Session
+from datetime import date, timedelta
 
 router = APIRouter(prefix="/api/v1/stocks", tags=["stock_detail"])
 
@@ -140,6 +144,87 @@ async def get_stock_detail(symbol: str):
     )
     
     return response
+
+
+@router.get("/{symbol}/bars")
+async def get_stock_bars(
+    symbol: str,
+    freq: str = Query(default="W", description="頻率 (W=週線，D=日線)"),
+    weeks: int = Query(default=52, ge=1, le=520, description="回傳週數"),
+    db: Session = Depends(get_db)
+):
+    """
+    獲取個股 K 線數據
+    
+    返回指定股票的歷史 K 線數據，支援週線和日線。
+    
+    ## 參數說明
+    - symbol: 股票代碼（如 2330.TW）
+    - freq: 頻率（W=週線，D=日線），預設為 W
+    - weeks: 回傳的週數，預設為 52 週（約 1 年）
+    
+    ## 回應格式
+    ```json
+    {
+      "symbol": "2330.TW",
+      "freq": "W",
+      "bars": [
+        {
+          "date": "2026-05-22",
+          "open": 575.0,
+          "high": 585.0,
+          "low": 570.0,
+          "close": 580.0,
+          "volume": 1000000,
+          "ma10": 560.0,
+          "ma30": 540.0
+        },
+        ...
+      ]
+    }
+    ```
+    """
+    # 查詢條件
+    cutoff_date = date.today() - timedelta(weeks=weeks)
+    
+    # 從資料庫查詢週線數據
+    results = (
+        db.query(StockBar)
+        .filter(
+            StockBar.code == symbol,
+            StockBar.freq == freq.upper(),
+            StockBar.trade_date >= cutoff_date
+        )
+        .order_by(StockBar.trade_date.asc())
+        .all()
+    )
+    
+    if not results:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"股票 {symbol} 的 {freq} 線數據不存在"
+        )
+    
+    # 轉換為 API 回應格式
+    bars = []
+    for bar in results:
+        bars.append({
+            "date": bar.trade_date.isoformat(),
+            "open": float(bar.open) if bar.open else 0.0,
+            "high": float(bar.high) if bar.high else 0.0,
+            "low": float(bar.low) if bar.low else 0.0,
+            "close": float(bar.close) if bar.close else 0.0,
+            "volume": int(bar.volume) if bar.volume else 0,
+            "ma10": float(bar.ma10_w) if bar.ma10_w else None,
+            "ma30": float(bar.ma30_w) if bar.ma30_w else None
+        })
+    
+    return {
+        "symbol": symbol,
+        "freq": freq.upper(),
+        "count": len(bars),
+        "bars": bars
+    }
 
 # 新增：用於獲取股票詳細信息的API，返回更完整的數據格式
 @router.get("/{symbol}/detail", response_model=StockDetailResponse)
