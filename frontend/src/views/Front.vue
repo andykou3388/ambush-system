@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import Layout from '@/components/Layout.vue'
 import StatCard from '@/components/StatCard.vue'
 import ZonePanel from '@/components/ZonePanel.vue'
+import Chart from 'chart.js/auto'
 
 // API 連接測試狀態
 const apiStatus = ref('未測試')
@@ -215,6 +216,25 @@ async function fetchStockBars(symbol) {
   }
 }
 
+function generateMockBars(basePrice) {
+  const bars = []
+  const now = new Date()
+  for (let i = 51; i >= 0; i--) {
+    const date = new Date(now)
+    date.setDate(date.getDate() - i * 7)
+    const close = basePrice * (0.85 + Math.random() * 0.3)
+    const ma10 = basePrice * (0.88 + Math.random() * 0.15)
+    const ma30 = basePrice * (0.82 + Math.random() * 0.12)
+    bars.push({
+      date: date.toISOString().split('T')[0],
+      close: close,
+      ma10: ma10,
+      ma30: ma30
+    })
+  }
+  return bars
+}
+
 async function initChart(stock) {
   const canvas = document.getElementById('stockChart')
   if (!canvas) return
@@ -222,12 +242,12 @@ async function initChart(stock) {
   const ctx = canvas.getContext('2d')
   
   // Fetch real weekly bar data from API
-  const bars = await fetchStockBars(stock.symbol)
+  let bars = await fetchStockBars(stock.symbol)
   
+  // If API returns no data, use mock data as fallback
   if (bars.length === 0) {
-    console.warn('No bar data available, using fallback')
-    chartInitialized.value = true
-    return
+    console.warn('No bar data available from API, using mock data as fallback')
+    bars = generateMockBars(stock.price || 100)
   }
   
   // Extract data arrays from bars
