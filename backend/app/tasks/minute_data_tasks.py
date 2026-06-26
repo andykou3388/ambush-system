@@ -16,6 +16,59 @@ from app.engine.ram_stop_loss import RamStopLossEngine
 logger = logging.getLogger(__name__)
 
 
+def _fetch_intraday_minute_data_impl():
+    """
+    盤中每分鐘獲取所有活躍部位的分鐘線數據（非 Celery 版本）
+    供開發和調試直接調用
+    
+    Returns:
+        dict: 執行結果，包含狀態、總數和結果列表
+    """
+    logger.info("開始獲取盤中分鐘線數據 [直接調用]")
+    engine = RamStopLossEngine()
+    
+    db = SessionLocal()
+    try:
+        # 獲取所有活躍部位
+        # active_positions = db.query(RamStopLoss).filter(
+        #     RamStopLoss.is_active == True
+        # ).all()
+        
+        active_positions = ['0700.HK', '9988.HK']  # TODO: 從資料庫獲取活躍部位，這裡為示範
+        
+        if not active_positions:
+            logger.info("無活躍部位，跳過分鐘線數據獲取")
+            return {"status": "no_active_positions"}
+        
+        codes = [p.code for p in active_positions]
+        logger.info(f"需要獲取 {len(codes)} 隻股票的分鐘線數據：{codes}")
+        
+        results = []
+        for code in codes:
+            try:
+                # TODO: 從 yfinance 或券商 API 獲取實際分鐘線數據
+                # 此處為示範，實際使用時需替換為真實數據源
+                # minute_data = get_minute_data_from_yfinance(code)
+                # result = engine.update_minute_data(code, minute_data)
+                # results.append(result)
+                
+                logger.info(f"{code} 分鐘線數據獲取（待接入真實數據源）")
+                results.append({"code": code, "status": "pending_data_source"})
+                
+            except Exception as e:
+                logger.error(f"獲取 {code} 分鐘線數據失敗：{e}")
+                results.append({"code": code, "status": "error", "error": str(e)})
+        
+        return {
+            "status": "success",
+            "total": len(codes),
+            "results": results,
+        }
+        
+    finally:
+        db.close()
+
+
 @shared_task(bind=True, max_retries=1)
 def fetch_intraday_minute_data(self):
     """
@@ -25,50 +78,9 @@ def fetch_intraday_minute_data(self):
     此處為框架示範，實際使用時需接入真實數據源
     """
     try:
-        logger.info("開始獲取盤中分鐘線數據")
-        engine = RamStopLossEngine()
-        
-        db = SessionLocal()
-        try:
-            # 獲取所有活躍部位
-            active_positions = db.query(RamStopLoss).filter(
-                RamStopLoss.is_active == True
-            ).all()
-            
-            if not active_positions:
-                logger.info("無活躍部位，跳過分鐘線數據獲取")
-                return {"status": "no_active_positions"}
-            
-            codes = [p.code for p in active_positions]
-            logger.info(f"需要獲取 {len(codes)} 隻股票的分鐘線數據: {codes}")
-            
-            results = []
-            for code in codes:
-                try:
-                    # TODO: 從 yfinance 或券商 API 獲取實際分鐘線數據
-                    # 此處為示範，實際使用時需替換為真實數據源
-                    # minute_data = get_minute_data_from_yfinance(code)
-                    # result = engine.update_minute_data(code, minute_data)
-                    # results.append(result)
-                    
-                    logger.info(f"{code} 分鐘線數據獲取（待接入真實數據源）")
-                    results.append({"code": code, "status": "pending_data_source"})
-                    
-                except Exception as e:
-                    logger.error(f"獲取 {code} 分鐘線數據失敗: {e}")
-                    results.append({"code": code, "status": "error", "error": str(e)})
-            
-            return {
-                "status": "success",
-                "total": len(codes),
-                "results": results,
-            }
-            
-        finally:
-            db.close()
-            
+        return _fetch_intraday_minute_data_impl()
     except Exception as exc:
-        logger.error(f"獲取分鐘線數據失敗: {exc}")
+        logger.error(f"獲取分鐘線數據失敗：{exc}")
         raise self.retry(exc=exc)
 
 
