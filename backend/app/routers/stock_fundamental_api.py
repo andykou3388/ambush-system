@@ -85,17 +85,16 @@ async def fetch_single_fundamental(symbol: str):
 @router.get("/list")
 async def list_fundamentals():
     """
-    獲取所有股票基本面數據（從歷史表）
+    獲取所有股票最新基本面數據（從 latest 緩存表）
     
     Returns:
-        list: 所有股票的基本面數據列表
+        list: 所有股票的最新基本面數據列表
     """
     db = SessionLocal()
     try:
-        stocks = db.query(StockFundamental).order_by(StockFundamental.code).all()
+        stocks = db.query(StockFundamentalLatest).order_by(StockFundamentalLatest.code).all()
         return [
             {
-                "id": s.id,
                 "code": s.code,
                 "market": s.market,
                 "report_date": str(s.report_date) if s.report_date else None,

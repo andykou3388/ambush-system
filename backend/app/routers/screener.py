@@ -225,7 +225,7 @@ async def batch_get_stocks(
              "tradeDate": str(r.trade_date) if r.trade_date else "",
              "pe": _safe_float(r.pe_ttm) if r.pe_ttm is not None else 0,
              "eps": f"{_safe_float(r.eps_ttm)}%" if r.eps_ttm is not None else "0%",
-             "mktCap": f"{_safe_float(r.total_market_cap)}億" if r.total_market_cap is not None else "0億",
+             "mktCap": f"{int(_safe_float(r.total_market_cap) / 100_000_000)}億" if r.total_market_cap is not None else "0億",
              "insider": str(r.insider_net_buy_3m) if r.insider_net_buy_3m is not None else "無異動",
              "lastUpdate": str(r.updated_at) if r.updated_at else str(r.trade_date),
                 "volChange": round(_safe_float(_vol_change_percent(r.volume, r.volume_ma5_w)), 2),
