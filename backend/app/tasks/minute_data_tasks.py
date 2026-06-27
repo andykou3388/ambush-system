@@ -29,12 +29,12 @@ def _fetch_intraday_minute_data_impl():
     
     db = SessionLocal()
     try:
-        # 獲取所有活躍部位
-        # active_positions = db.query(RamStopLoss).filter(
-        #     RamStopLoss.is_active == True
-        # ).all()
+        獲取所有活躍部位
+        active_positions = db.query(RamStopLoss).filter(
+            RamStopLoss.is_active == True
+        ).all()
         
-        active_positions = ['0700.HK', '9988.HK']  # TODO: 從資料庫獲取活躍部位，這裡為示範
+        #active_positions = ['0700.HK', '9988.HK']  # TODO: 從資料庫獲取活躍部位，這裡為示範
         
         if not active_positions:
             logger.info("無活躍部位，跳過分鐘線數據獲取")

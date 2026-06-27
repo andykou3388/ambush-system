@@ -511,6 +511,12 @@ async function initChart(stock) {
                 <span class="text-slate-400">題材熱度</span>
                 <span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">{{ selectedStock.topic }}</span>
               </li>
+              <li class="flex justify-between items-center text-sm">
+                <a :href="`https://hk.finance.yahoo.com/quote/${selectedStock.symbol}/`" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+                <span>Yahoo Finance 詳情</span>
+                <i class="ph-bold ph-arrow-square-out text-xs"></i>
+                </a>
+               </li>
             </ul>
           </div>
 
