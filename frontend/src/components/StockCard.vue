@@ -54,10 +54,27 @@
       </div>
     </div>
 
-    <!-- Action Hint -->
+    <!-- Action Hint / Track Button -->
     <div class="pt-2 border-t border-slate-700 flex justify-between items-center">
-      <span class="text-[10px] text-slate-500 mono">收盤更新: {{ stock.lastUpdate }}</span>
-      <span class="text-[10px] font-bold text-blue-400 group-hover:text-blue-300 flex items-center gap-1">
+      <span class="text-[10px] text-slate-500 mono">收盤更新：{{ stock.lastUpdate }}</span>
+      
+      <!-- 加入追蹤按鈕 -->
+      <button 
+        v-if="!isTracked"
+        @click.stop="toggleTracking"
+        class="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+      >
+        <i class="ph-bold ph-plus-circle"></i>
+        加入追蹤
+      </button>
+      
+      <!-- 追蹤中徽章 -->
+      <span v-else class="text-[10px] font-bold text-green-400 flex items-center gap-1">
+        <i class="ph-bold ph-check-circle"></i>
+        追蹤中
+      </span>
+      
+      <span class="text-[10px] font-bold text-blue-400 group-hover:text-blue-300 flex items-center gap-1 ml-2">
         查看詳情 <i class="ph-bold ph-arrow-right"></i>
       </span>
     </div>
@@ -65,16 +82,83 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
   stock: { type: Object, required: true }
 })
 
-const emit = defineEmits(['open'])
+const emit = defineEmits(['open', 'tracking-change'])
 
-const router = useRouter()
+const isTracked = ref(false)
+const loading = ref(false)
+
+// 本地維護已追蹤股票集合
+const trackedSymbols = ref(new Set())
+
+// 加載已追蹤的股票代碼
+const loadTrackedSymbols = async () => {
+  try {
+    const response = await fetch('/api/ram-stop-loss/positions')
+    if (response.ok) {
+      const data = await response.json()
+      data.forEach(pos => {
+        trackedSymbols.value.add(pos.code)
+      })
+    }
+  } catch (error) {
+    console.error('獲取追蹤列表失敗:', error)
+  }
+}
+
+// 切換追蹤狀態
+const toggleTracking = async () => {
+  if (loading.value) return
+  
+  loading.value = true
+  
+  try {
+    // 檢查是否已追蹤
+    if (trackedSymbols.value.has(props.stock.symbol)) {
+      // 已追蹤，移除（可選擴展功能）
+      // 這裡可以實現取消追蹤功能
+      alert(`${props.stock.symbol} 已在追蹤清單中`)
+    } else {
+      // 新增追蹤
+      const response = await fetch('/api/ram-stop-loss/positions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code: props.stock.symbol,
+          market: 'TW',
+          buy_date: new Date().toISOString().split('T')[0],
+          buy_price: null  // 先創建，之後再設定買入價
+        })
+      })
+      
+      if (response.ok) {
+        trackedSymbols.value.add(props.stock.symbol)
+        isTracked.value = true
+        emit('tracking-change', { symbol: props.stock.symbol, tracked: true })
+        alert(`✅ 已將 ${props.stock.symbol} 加入實時追蹤\n請前往「實時追蹤」頁面設定買入價格`)
+      } else {
+        throw new Error('加入追蹤失敗')
+      }
+    }
+  } catch (error) {
+    console.error('追蹤操作失敗:', error)
+    alert('❌ 追蹤操作失敗，請稍後再試')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadTrackedSymbols()
+})
 
 const zoneBadgeClass = computed(() => ({
   'bg-green-600': props.stock.zone === 'up',

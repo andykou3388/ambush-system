@@ -40,6 +40,7 @@
           <span class="w-2 h-2 rounded-full bg-trading-green animate-pulse"></span>
           <span v-if="$route.path === '/'">實盤監控看板</span>
           <span v-else-if="$route.path === '/stockpool'">股票池瀏覽器</span>
+          <span v-else-if="$route.path === '/ram-stop-loss'">實時動態止損追蹤</span>
           <span v-else>伏擊系統</span>
           <span class="text-xs text-slate-500 font-normal mono">2026-05-19 週五 16:00 UTC+8</span>
         </h1>
@@ -94,6 +95,7 @@ const menuItems = [
   { id: 'stockpool', label: '篩選器', icon: 'ph-funnel' },
   { id: 'screen', label: '智能篩選', icon: 'ph-funnel' },
   { id: 'alerts', label: '信號預警', icon: 'ph-bell-ringing' },
+  { id: 'ram-stop-loss', label: '實時追蹤', icon: 'ph-shield-check' },
   { id: 'logs', label: '風控日誌', icon: 'ph-scroll' },
   { id: 'settings', label: '系統設置', icon: 'ph-gear' }
 ]

@@ -31,6 +31,15 @@ const routes = [
     path: '/stockpool',
     name: 'StockPool',
     component: StockPool
+  },
+  {
+    path: '/ram-stop-loss',
+    name: 'RamStopLossTracker',
+    component: () => import('@/views/RamStopLossTracker.vue'),
+    meta: { 
+      requiresAuth: true,
+      title: '實時動態止損追蹤'
+    }
   }
 ]
 
