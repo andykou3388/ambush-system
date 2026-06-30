@@ -220,7 +220,22 @@
           </div>
 
           <!-- 右側：操作按鈕 -->
-          <div class="flex items-center gap-2 lg:ml-4">
+          <div class="flex items-center gap-2 lg:ml-4 flex-wrap">
+            <!-- 加入追蹤按鈕 -->
+            <button 
+              v-if="!isTracked(stock.code)"
+              @click="addToTracking(stock)"
+              :disabled="trackingLoading"
+              class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded text-sm transition flex items-center gap-1 shadow-lg"
+            >
+              <span>＋</span> 追蹤
+            </button>
+            <span 
+              v-else
+              class="text-green-400 text-xs font-bold px-2 py-1 bg-green-900/30 rounded border border-green-700 flex items-center gap-1"
+            >
+              <span>✓</span> 已追蹤
+            </span>
             <button 
               v-if="!isInWatchlist(stock.code)"
               @click="addToWatchlist(stock)"
@@ -370,6 +385,59 @@ async function fetchStocks() {
   }
 }
 
+// 追蹤狀態
+const trackingSymbols = ref(new Set())
+const trackingLoading = ref(false)
+
+// 獲取已追蹤的股票代碼
+const loadTrackedSymbols = async () => {
+  try {
+    const response = await fetch('/api/ram-stop-loss/positions')
+    if (response.ok) {
+      const data = await response.json()
+      data.forEach(pos => {
+        trackingSymbols.value.add(pos.code)
+      })
+    }
+  } catch (error) {
+    console.error('獲取追蹤清單失敗:', error)
+  }
+}
+
+// 檢查是否已追蹤
+const isTracked = (code) => {
+  return trackingSymbols.value.has(code)
+}
+
+// 加入實時追蹤
+const addToTracking = async (stock) => {
+  trackingLoading.value = true
+  try {
+    const response = await fetch('/api/ram-stop-loss/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: stock.code,
+        market: stock.market,
+        buy_date: new Date().toISOString().split('T')[0],
+        buy_price: null
+      })
+    })
+    
+    if (response.ok) {
+      trackingSymbols.value.add(stock.code)
+      showToast(`✅ 已將 ${stock.code} 加入實時追蹤`, 'success', '✅')
+    } else {
+      throw new Error('加入追蹤失敗')
+    }
+  } catch (error) {
+    console.error('追蹤失敗:', error)
+    showToast(`❌ ${stock.code} 加入追蹤失敗`, 'error', '❌')
+  } finally {
+    trackingLoading.value = false
+  }
+}
+
 // 狀態
 const watchlist = ref([])
 const searchQuery = ref('')
@@ -392,6 +460,7 @@ const sortOptions = [
 // 初始化
 onMounted(() => {
   fetchStocks()
+  loadTrackedSymbols()
   const saved = localStorage.getItem('my_watchlist_v2')
   if (saved) {
     try { watchlist.value = JSON.parse(saved) } catch(e) {}

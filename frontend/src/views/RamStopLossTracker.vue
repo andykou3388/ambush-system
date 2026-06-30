@@ -1,59 +1,40 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Layout from '@/components/Layout.vue'
+import { useRamStopLossData } from '@/composables/useRamStopLossData'
 
-// 響應式數據
-const positions = ref([])
-const loading = ref(false)
-const error = ref(null)
-
-// 統計數據
-const stats = computed(() => {
-  const tracking = positions.value.filter(p => !p.buyPrice).length
-  const monitoring = positions.value.filter(p => p.buyPrice && !p.isTriggered && p.isActive).length
-  const triggered = positions.value.filter(p => p.isTriggered).length
-  return { tracking, monitoring, triggered }
-})
-
-// 狀態文字映射
-const statusText = {
-  tracking: '追蹤中',
-  monitoring: '監控中',
-  triggered: '已觸發'
-}
-
-// 狀態顏色
-const statusColors = {
-  tracking: 'bg-blue-600',
-  monitoring: 'bg-green-600',
-  triggered: 'bg-red-600'
-}
+// 使用止損數據 composable
+const {
+  positions,
+  loading,
+  error,
+  trackingCount,
+  monitoringCount,
+  triggeredCount,
+  totalPositions,
+  activePositions,
+  fetchPositions,
+  activateStopLoss,
+  getPositionStatus,
+  checkStopLoss,
+  checkAllStopLoss,
+  closePosition,
+  formatPrice,
+  formatPct,
+  getPriceClass,
+  getDrawdownPercent,
+  getStatusText,
+  getStatusColorClass,
+  clearAll
+} = useRamStopLossData()
 
 // 買入價輸入（用於追蹤中狀態）
 const buyPriceInput = ref({})
 
-// 獲取所有止損追蹤部位
-const fetchPositions = async () => {
-  loading.value = true
-  error.value = null
-  
-  try {
-    const response = await fetch('/api/ram-stop-loss/positions')
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    positions.value = data
-  } catch (err) {
-    error.value = err.message
-    console.error('獲取止損數據失敗:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 啟用止損監控
-const activateMonitoring = async (code) => {
+/**
+ * 啟用止損監控
+ */
+const handleActivateMonitoring = async (code) => {
   const buyPrice = buyPriceInput.value[code]
   
   if (!buyPrice || buyPrice <= 0) {
@@ -62,23 +43,9 @@ const activateMonitoring = async (code) => {
   }
   
   try {
-    const response = await fetch('/api/ram-stop-loss/positions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        code: code,
-        market: 'TW',
-        buy_date: new Date().toISOString().split('T')[0],
-        buy_price: parseFloat(buyPrice)
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('啟動監控失敗')
-    }
-    
+    await activateStopLoss(code, buyPrice)
+    // 清空輸入框
+    buyPriceInput.value[code] = ''
     // 重新獲取數據
     await fetchPositions()
   } catch (err) {
@@ -86,28 +53,61 @@ const activateMonitoring = async (code) => {
   }
 }
 
-// 格式化價格
-const formatPrice = (price) => {
-  return price ? parseFloat(price).toFixed(2) : '-'
+// 手動檢查止損
+const handleCheckStopLoss = async (code) => {
+  try {
+    await checkStopLoss(code)
+    await fetchPositions()
+  } catch (err) {
+    alert('檢查止損失敗：' + err.message)
+  }
 }
 
-// 格式化百分比
-const formatPct = (pct) => {
-  return pct ? (pct * 100).toFixed(2) + '%' : '0%'
+// 關閉止損部位
+const handleClosePosition = async (code) => {
+  if (!confirm(`確定要關閉 ${code} 的止損追蹤嗎？`)) {
+    return
+  }
+  
+  try {
+    await closePosition(code)
+  } catch (err) {
+    alert('關閉部位失敗：' + err.message)
+  }
 }
 
-// 判斷漲跌樣式
-const getPriceClass = (currentPrice, buyPrice) => {
-  if (!buyPrice) return ''
-  const change = currentPrice - buyPrice
-  const isUp = change >= 0
-  return isUp ? 'text-green-400' : 'text-red-400'
+// 批量檢查所有活躍部位
+const handleCheckAll = async () => {
+  if (!confirm('確定要檢查所有活躍部位的止損嗎？')) {
+    return
+  }
+  
+  try {
+    await checkAllStopLoss()
+  } catch (err) {
+    alert('批量檢查失敗：' + err.message)
+  }
 }
 
-// 計算回撤進度
-const getDrawdownPercent = (position) => {
-  if (!position.highestPrice || !position.currentPrice) return 0
-  return ((position.highestPrice - position.currentPrice) / position.highestPrice * 100).toFixed(1)
+// 統計數據對象（保持與原模板相容）
+const stats = computed(() => ({
+  tracking: trackingCount.value,
+  monitoring: monitoringCount.value,
+  triggered: triggeredCount.value
+}))
+
+// 狀態文字映射（保持與原模板相容）
+const statusText = {
+  tracking: '追蹤中',
+  monitoring: '監控中',
+  triggered: '已觸發'
+}
+
+// 狀態顏色（保持與原模板相容）
+const statusColors = {
+  tracking: 'bg-blue-600',
+  monitoring: 'bg-green-600',
+  triggered: 'bg-red-600'
 }
 
 // 初始化加載
@@ -245,7 +245,7 @@ onMounted(() => {
               />
             </div>
             <button 
-              @click="activateMonitoring(pos.code)"
+              @click="handleActivateMonitoring(pos.code)"
               class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium flex items-center gap-2 whitespace-nowrap"
             >
               <i class="ph-bold ph-play"></i>
