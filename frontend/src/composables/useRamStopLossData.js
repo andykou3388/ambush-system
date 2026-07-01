@@ -3,15 +3,27 @@
  * 
  * 封裝止損追蹤相關的 API 調用邏輯，提供給其他組件複用
  * @author Frontend Developer
- * @task RAM-05
+ * @task RAM-05, RAM-06
  */
 import { ref, computed } from 'vue'
 
 /**
  * 止損追蹤資料 composable
+ * @param {Object} options - 配置選項
+ * @param {number} options.interval - 自動刷新間隔（毫秒），預設 60000
  * @returns {Object} 止損追蹤相關的状态、方法和計算屬性
  */
-export function useRamStopLossData() {
+export function useRamStopLossData(options = {}) {
+  // ========================================
+  // 自動刷新配置
+  // ========================================
+  
+  const AUTO_REFRESH_INTERVAL = options.interval || 60000 // 預設 60 秒
+  
+  let refreshIntervalId = null
+  let isAutoRefreshing = ref(false)
+  let lastRefreshTime = ref(null)
+  
   // ========================================
   // 狀態定義
   // ========================================
@@ -58,6 +70,17 @@ export function useRamStopLossData() {
   const activePositions = computed(() => {
     return positions.value.filter(p => p.isActive).length
   })
+  
+  /** 計算距離上次刷新的時間 */
+  const timeSinceLastRefresh = computed(() => {
+    if (!lastRefreshTime.value) return '尚未刷新'
+    
+    const seconds = Math.floor((Date.now() - lastRefreshTime.value.getTime()) / 1000)
+    
+    if (seconds < 60) return `${seconds}秒前`
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes}分鐘前`
+  })
 
   // ========================================
   // 核心方法 - API 調用
@@ -83,6 +106,11 @@ export function useRamStopLossData() {
       
       const data = await response.json()
       positions.value = data || []
+      
+      // 更新最後刷新時間（手動刷新才記錄）
+      if (!isAutoRefreshing.value) {
+        lastRefreshTime.value = new Date()
+      }
       
       return positions.value
     } catch (err) {
@@ -311,6 +339,92 @@ export function useRamStopLossData() {
   }
 
   // ========================================
+  // 自動刷新功能
+  // ========================================
+  
+  /**
+   * 啟動自動刷新
+   */
+  const startAutoRefresh = () => {
+    if (refreshIntervalId) return
+    
+    isAutoRefreshing.value = true
+    
+    // 立即執行一次
+    fetchPositions().catch(err => {
+      console.error('自動刷新初始獲取失敗:', err)
+      isAutoRefreshing.value = false
+    })
+    
+    // 設置定時器
+    refreshIntervalId = setInterval(async () => {
+      try {
+        await fetchPositions()
+        lastRefreshTime.value = new Date()
+      } catch (error) {
+        console.error('自動刷新失敗:', error)
+        // 不中斷自動刷新，繼續下一輪
+      }
+    }, AUTO_REFRESH_INTERVAL)
+  }
+  
+  /**
+   * 停止自動刷新
+   */
+  const stopAutoRefresh = () => {
+    if (refreshIntervalId) {
+      clearInterval(refreshIntervalId)
+      refreshIntervalId = null
+      isAutoRefreshing.value = false
+    }
+  }
+  
+  /**
+   * 切換自動刷新狀態
+   */
+  const toggleAutoRefresh = () => {
+    if (isAutoRefreshing.value) {
+      stopAutoRefresh()
+    } else {
+      startAutoRefresh()
+    }
+  }
+  
+  /**
+   * 根據視圖可見性自動調整刷新
+   * @returns {Function} 清理函數
+   */
+  const setupVisibilityHandling = () => {
+    const handleChange = () => {
+      if (document.hidden) {
+        // 頁面隱藏時暫停刷新
+        stopAutoRefresh()
+      } else {
+        // 頁面重新顯示時恢復刷新
+        startAutoRefresh()
+        // 立即刷新一次獲取最新數據
+        fetchPositions().catch(err => {
+          console.error('可見性恢復後獲取失敗:', err)
+        })
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleChange)
+    
+    // 返回清理函數
+    return () => {
+      document.removeEventListener('visibilitychange', handleChange)
+    }
+  }
+  
+  /**
+   * 組件卸載時的清理方法
+   */
+  const cleanup = () => {
+    stopAutoRefresh()
+  }
+
+  // ========================================
   // 工具方法
   // ========================================
   
@@ -445,6 +559,13 @@ export function useRamStopLossData() {
     activePositions,
     
     // ======================================
+    // 自動刷新狀態
+    // ======================================
+    isAutoRefreshing,
+    lastRefreshTime,
+    timeSinceLastRefresh,
+    
+    // ======================================
     // 主要 API 方法
     // ======================================
     fetchPositions,
@@ -454,6 +575,15 @@ export function useRamStopLossData() {
     checkAllStopLoss,
     closePosition,
     checkMultipleStopLoss,
+    
+    // ======================================
+    // 自動刷新控制方法
+    // ======================================
+    startAutoRefresh,
+    stopAutoRefresh,
+    toggleAutoRefresh,
+    setupVisibilityHandling,
+    cleanup,
     
     // ======================================
     // 工具函數

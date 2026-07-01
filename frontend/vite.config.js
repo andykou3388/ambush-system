@@ -7,6 +7,11 @@ export default defineConfig({
   resolve: {
     alias: [{ find: '@', replacement: path.resolve(__dirname, 'src') }]
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['tests/**/*.{test,spec}.{js,ts}'],
+  },
   server: {
     host: true,
     port: 3000,

@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Layout from '@/components/Layout.vue'
 import { useRamStopLossData } from '@/composables/useRamStopLossData'
 
-// 使用止損數據 composable
+// 使用止損數據 composable，設定 60 秒自動刷新間隔
 const {
   positions,
   loading,
@@ -25,8 +25,20 @@ const {
   getDrawdownPercent,
   getStatusText,
   getStatusColorClass,
-  clearAll
-} = useRamStopLossData()
+  clearAll,
+  
+  // 自動刷新相關
+  isAutoRefreshing,
+  lastRefreshTime,
+  timeSinceLastRefresh,
+  startAutoRefresh,
+  stopAutoRefresh,
+  toggleAutoRefresh,
+  setupVisibilityHandling,
+  cleanup
+} = useRamStopLossData({
+  interval: 60000 // 設定 60 秒刷新間隔
+})
 
 // 買入價輸入（用於追蹤中狀態）
 const buyPriceInput = ref({})
@@ -113,25 +125,50 @@ const statusColors = {
 // 初始化加載
 onMounted(() => {
   fetchPositions()
+  setupVisibilityHandling()
+  startAutoRefresh() // 預設啟用自動刷新
+})
+
+onUnmounted(() => {
+  cleanup()
 })
 </script>
 
 <template>
   <Layout>
     <!-- 頁面標題區域 -->
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
       <h1 class="text-xl font-bold text-white flex items-center gap-2">
         <i class="ph-bold ph-shield-check text-trading-green"></i>
         實時動態止損追蹤
       </h1>
-      <button 
-        @click="fetchPositions" 
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-2 transition-colors"
-        :disabled="loading"
-      >
-        <i :class="['ph-bold', loading ? 'ph-spinner animate-spin' : 'ph-arrows-clockwise']"></i>
-        {{ loading ? '載入中...' : '刷新' }}
-      </button>
+      
+      <!-- Header 控制區 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm text-slate-400" v-if="timeSinceLastRefresh">
+          最後更新：{{ timeSinceLastRefresh }}
+        </span>
+        
+        <button 
+          @click="toggleAutoRefresh" 
+          :class="{ 'bg-green-600': isAutoRefreshing, 'bg-gray-700': !isAutoRefreshing }"
+          class="px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+          :title="isAutoRefreshing ? '停用自動刷新' : '啟用自動刷新'"
+        >
+          <i :class="['ph-bold', isAutoRefreshing ? 'ph-pause-circle' : 'ph-play-circle']"></i>
+          {{ isAutoRefreshing ? '停用自動刷新' : '啟用自動刷新' }}
+        </button>
+        
+        <button 
+          @click="() => fetchPositions()" 
+          :class="{ 'cursor-wait': loading }"
+          class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap"
+          :disabled="loading"
+        >
+          <i :class="['ph-bold', loading ? 'ph-spinner animate-spin' : 'ph-arrows-clockwise']"></i>
+          {{ loading ? '載入中...' : '刷新' }}
+        </button>
+      </div>
     </div>
 
     <!-- 統計摘要區域 -->
@@ -180,7 +217,7 @@ onMounted(() => {
     </div>
 
     <!-- 資料載入狀態 -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-20">
+    <div v-if="loading && !isAutoRefreshing" class="flex flex-col items-center justify-center py-20">
       <i class="ph-bold ph-spinner animate-spin text-blue-500 text-4xl mb-4"></i>
       <p class="text-slate-400">正在載入止損追蹤數據...</p>
     </div>
@@ -190,12 +227,12 @@ onMounted(() => {
       <i class="ph-bold ph-warning text-red-500 text-4xl mb-4"></i>
       <p class="text-red-400 mb-2">載入失敗</p>
       <p class="text-sm text-slate-400">{{ error }}</p>
-      <button 
-        @click="fetchPositions" 
-        class="mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg"
-      >
-        重試
-      </button>
+        <button 
+          @click="() => fetchPositions()" 
+          class="mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg"
+        >
+          重試
+        </button>
     </div>
 
     <!-- 空狀態 -->
@@ -210,7 +247,7 @@ onMounted(() => {
     <div v-else class="space-y-4">
       <div v-for="pos in positions" :key="pos.code" 
         class="bg-slate-800/50 border border-trading-border rounded-lg overflow-hidden"
-        :class="{'opacity-50': pos.isTriggered}"
+        :class="{ 'opacity-50': pos.isTriggered }"
       >
         <!-- 卡片頭部 -->
         <div class="p-4 border-b border-trading-border flex justify-between items-start">
@@ -316,5 +353,15 @@ onMounted(() => {
 <style scoped>
 .mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* 自動化刷新指示器動畫 */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.live-indicator {
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 </style>
