@@ -413,14 +413,11 @@ const isTracked = (code) => {
 const addToTracking = async (stock) => {
   trackingLoading.value = true
   try {
-    const response = await fetch('/api/ram-stop-loss/positions', {
+    const response = await fetch('/api/ram-stop-loss/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code: stock.code,
-        market: stock.market,
-        buy_date: new Date().toISOString().split('T')[0],
-        buy_price: null
+        code: stock.code
       })
     })
     
@@ -428,7 +425,8 @@ const addToTracking = async (stock) => {
       trackingSymbols.value.add(stock.code)
       showToast(`✅ 已將 ${stock.code} 加入實時追蹤`, 'success', '✅')
     } else {
-      throw new Error('加入追蹤失敗')
+      const errData = await response.json().catch(() => ({}))
+      throw new Error(errData.detail?.message || '加入追蹤失敗')
     }
   } catch (error) {
     console.error('追蹤失敗:', error)

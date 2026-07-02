@@ -129,45 +129,42 @@ export function useRamStopLossData(options = {}) {
    * 啟用止損監控（設定買入價）
    * @param {string} code - 股票代碼
    * @param {number} buyPrice - 買入價格
-   * @param {string} market - 市場類型（預設 TW）
-   * @param {string} buyDate - 買入日期（預設今日）
-   * @returns {Promise<Object>} -API 響應結果
+   * @returns {Promise<Object>} API 響應結果
    */
-  const activateStopLoss = async (code, buyPrice, market = 'TW', buyDate = null) => {
+  const activateStopLoss = async (code, buyPrice) => {
     loading.value = true
     error.value = null
     
     try {
-      const response = await fetch(`${API_BASE}/positions`, {
+      const response = await fetch(`${API_BASE}/activate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           code: code,
-          market: market,
-          buy_date: buyDate || new Date().toISOString().split('T')[0],
           buy_price: parseFloat(buyPrice)
         })
       })
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || '啟動監控失敗')
+        throw new Error(errorData.detail?.message || errorData.message || '啟動監控失敗')
       }
       
       const result = await response.json()
       
-      // 立即更新本地狀態
+      // 立即更新本地狀態（適配新 response 格式：{ success, message, data: {...} }）
+      const positionData = result.data || result
       const existingIndex = positions.value.findIndex(p => p.code === code)
       if (existingIndex >= 0) {
         positions.value[existingIndex] = {
           ...positions.value[existingIndex],
-          ...result,
+          ...positionData,
           isActive: true
         }
       } else {
-        positions.value.unshift(result)
+        positions.value.unshift(positionData)
       }
       
       return result

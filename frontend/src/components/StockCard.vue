@@ -95,16 +95,16 @@ const isTracked = ref(false)
 const loading = ref(false)
 
 // 本地維護已追蹤股票集合
-const trackedSymbols = ref(new Set())
+const trackedCodes = ref(new Set())
 
 // 加載已追蹤的股票代碼
-const loadTrackedSymbols = async () => {
+const loadTrackedCodes = async () => {
   try {
     const response = await fetch('/api/ram-stop-loss/positions')
     if (response.ok) {
       const data = await response.json()
       data.forEach(pos => {
-        trackedSymbols.value.add(pos.code)
+        trackedCodes.value.add(pos.code)
       })
     }
   } catch (error) {
@@ -120,32 +120,28 @@ const toggleTracking = async () => {
   
   try {
     // 檢查是否已追蹤
-    if (trackedSymbols.value.has(props.stock.symbol)) {
-      // 已追蹤，移除（可選擴展功能）
-      // 這裡可以實現取消追蹤功能
+    if (trackedCodes.value.has(props.stock.symbol)) {
       alert(`${props.stock.symbol} 已在追蹤清單中`)
     } else {
-      // 新增追蹤
-      const response = await fetch('/api/ram-stop-loss/positions', {
+      // 新增追蹤 - 使用新的 create API
+      const response = await fetch('/api/ram-stop-loss/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          code: props.stock.symbol,
-          market: 'TW',
-          buy_date: new Date().toISOString().split('T')[0],
-          buy_price: null  // 先創建，之後再設定買入價
+          code: props.stock.symbol
         })
       })
       
       if (response.ok) {
-        trackedSymbols.value.add(props.stock.symbol)
+        trackedCodes.value.add(props.stock.symbol)
         isTracked.value = true
-        emit('tracking-change', { symbol: props.stock.symbol, tracked: true })
+        emit('tracking-change', { code: props.stock.symbol, tracked: true })
         alert(`✅ 已將 ${props.stock.symbol} 加入實時追蹤\n請前往「實時追蹤」頁面設定買入價格`)
       } else {
-        throw new Error('加入追蹤失敗')
+        const errData = await response.json()
+        throw new Error(errData.detail?.message || '加入追蹤失敗')
       }
     }
   } catch (error) {
@@ -157,7 +153,7 @@ const toggleTracking = async () => {
 }
 
 onMounted(() => {
-  loadTrackedSymbols()
+  loadTrackedCodes()
 })
 
 const zoneBadgeClass = computed(() => ({

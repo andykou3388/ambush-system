@@ -238,6 +238,128 @@ class RamStopLossEngine:
     # 建立止損部位
     # ==========================================
 
+    def _fetch_current_price(self, code: str) -> dict:
+        """
+        獲取股票當前市價
+        
+        Args:
+            code: 股票代碼（如 2330.TW）
+        
+        Returns:
+            {"price": float, "high": float} 或 None（無法獲取時）
+        """
+        try:
+            db = SessionLocal()
+            try:
+                latest = db.query(StockBarMinute).filter(
+                    StockBarMinute.code == code,
+                    StockBarMinute.is_valid == True
+                ).order_by(desc(StockBarMinute.trade_time)).first()
+                
+                if latest and latest.corrected_close:
+                    return {
+                        "price": float(latest.corrected_close),
+                        "high": float(latest.high) if latest.high else float(latest.corrected_close),
+                    }
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"從分鐘線獲取 {code} 價格失敗: {e}")
+        
+        return None
+
+    def activate_stop_loss(self, code: str, buy_price: float) -> dict:
+        """
+        從 tracking 狀態激活為 monitoring（設定買入價後啟用止損監控）
+        
+        Args:
+            code: 股票代碼（如 2330.TW）
+            buy_price: 買入價格
+        
+        Returns:
+            {
+                "status": "activated" | "not_found" | "already_monitoring" | "error",
+                "code": ...,
+                "message": ...,
+                "data": {...}
+            }
+        """
+        db = SessionLocal()
+        try:
+            # 1. 查詢 tracking 記錄
+            position = db.query(RamStopLoss).filter(
+                RamStopLoss.code == code,
+                RamStopLoss.is_active == True
+            ).first()
+            
+            if not position:
+                return {
+                    "status": "not_found",
+                    "code": code,
+                    "message": "找不到追蹤記錄，請先加入追蹤"
+                }
+            
+            # 2. 檢查是否已設定買入價（防止重複激活）
+            if position.buy_price is not None:
+                return {
+                    "status": "already_monitoring",
+                    "code": code,
+                    "message": "此股票已設定買入價，無法重複設定"
+                }
+            
+            # 3. 獲取當前市價
+            current_data = self._fetch_current_price(code)
+            current_price = current_data["price"] if current_data else buy_price
+            high_price = current_data["high"] if current_data else buy_price
+            
+            # 4. 最高價取 max(buy_price, 當前市價)
+            highest_price = max(buy_price, current_price, high_price)
+            
+            # 5. 計算初始止損價
+            stop_loss_price = round(highest_price * (1 - self.drawdown_ratio), 2)
+            
+            # 6. 更新記錄
+            position.buy_price = round(Decimal(str(buy_price)), 4)
+            position.current_price = round(Decimal(str(current_price)), 4)
+            position.highest_price = round(Decimal(str(highest_price)), 4)
+            position.stop_loss_price = round(Decimal(str(stop_loss_price)), 4)
+            position.drawdown_pct = Decimal('0')
+            position.status = 'monitoring'
+            position.updated_at = datetime.now()
+            
+            db.commit()
+            
+            logger.info(
+                f"✅ {code} 啟用止損監控: "
+                f"買入價={buy_price:.2f}, "
+                f"當前價={current_price:.2f}, "
+                f"最高價={highest_price:.2f}, "
+                f"止損價={stop_loss_price:.2f}"
+            )
+            
+            return {
+                "status": "activated",
+                "code": code,
+                "message": "已啟用止損監控",
+                "data": {
+                    "code": position.code,
+                    "name": position.name or "",
+                    "buy_price": buy_price,
+                    "current_price": current_price,
+                    "highest_price": highest_price,
+                    "stop_loss_price": stop_loss_price,
+                    "drawdown_pct": 0.0,
+                    "status": "monitoring",
+                }
+            }
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"啟用 {code} 止損監控失敗: {e}")
+            return {"status": "error", "code": code, "message": "伺服器內部錯誤"}
+        finally:
+            db.close()
+
     def create_position(self, code: str, market: str, buy_date, buy_price: float) -> dict:
         """
         建立新的止損部位（買入股票時調用）
@@ -267,6 +389,7 @@ class RamStopLossEngine:
             ram = RamStopLoss(
                 code=code,
                 market=market,
+                status='monitoring',
                 buy_date=buy_date,
                 buy_price=round(Decimal(str(buy_price)), 4),
                 highest_price=round(Decimal(str(buy_price)), 4),
