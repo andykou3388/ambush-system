@@ -1,3 +1,7 @@
+
+
+podman exec ambush-system_db_1 pg_dump -U dev_user -d ambush_dev > db_dump.sql
+
 podman compose exec backend celery -A app.celery_app call app.tasks.oneclick_init_task.oneclick_init_data 
 
 podman exec -it ambush-system-postgres-1 psql -U dev_user -d ambush_dev -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO dev_user;"
