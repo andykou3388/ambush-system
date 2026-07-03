@@ -122,6 +122,16 @@ const statusColors = {
   triggered: 'bg-red-600'
 }
 
+// 計算屬性：處理 is_active 字段映射（API 返回的是 is_active，前端需要 isActive）
+const getPositionData = (pos) => {
+  return {
+    ...pos,
+    // API 返回 snake_case，這裡統一為 camelCase 供模板使用
+    isActive: pos.is_active || false,
+    isTriggered: pos.is_triggered || false
+  }
+}
+
 // 初始化加載
 onMounted(() => {
   fetchPositions()
@@ -243,8 +253,8 @@ onUnmounted(() => {
       <p class="text-slate-500">目前沒有追蹤的止損部位</p>
     </div>
 
-    <!-- 部位列表 -->
-    <div v-else class="space-y-4">
+    <!-- 部位列表 - 3 欄網格布局 (響應式) -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div v-for="pos in positions" :key="pos.code" 
         class="bg-slate-800/50 border border-trading-border rounded-lg overflow-hidden"
         :class="{ 'opacity-50': pos.isTriggered }"
@@ -254,9 +264,10 @@ onUnmounted(() => {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2">
               <h3 class="text-lg font-bold text-white mono">{{ pos.code }}</h3>
-              <span :class="['px-2 py-0.5 rounded text-[10px] font-bold text-white', statusColors[pos.isTriggered ? 'triggered' : (pos.buyPrice ? 'monitoring' : 'tracking')]]">
-                {{ statusText[pos.isTriggered ? 'triggered' : (pos.buyPrice ? 'monitoring' : 'tracking')] }}
-              </span>
+        <!-- 狀態判斷邏輯修正：buyPrice=0 視為追蹤中 -->
+        <span :class="['px-2 py-0.5 rounded text-[10px] font-bold text-white', statusColors[pos.isTriggered ? 'triggered' : (pos.buyPrice && pos.buyPrice > 0 ? 'monitoring' : 'tracking')]]">
+          {{ statusText[pos.isTriggered ? 'triggered' : (pos.buyPrice && pos.buyPrice > 0 ? 'monitoring' : 'tracking')] }}
+        </span>
             </div>
             <p class="text-sm text-slate-400">{{ pos.name || '股票名稱待定' }}</p>
           </div>
@@ -269,7 +280,7 @@ onUnmounted(() => {
         <!-- 內容區域 -->
         <div class="p-4">
           <!-- 追蹤中狀態 - 輸入買入價 -->
-          <div v-if="!pos.buyPrice" class="flex items-center gap-4">
+          <div v-if="!pos.buyPrice || pos.buyPrice === 0" class="flex items-center gap-4">
             <div class="flex-1">
               <label class="block text-xs text-slate-400 mb-1">輸入買入價格</label>
               <input 
@@ -290,8 +301,8 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- 監控中狀態 - 顯示詳細資訊 -->
-          <div v-else-if="!pos.isTriggered && pos.isActive" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <!-- 監控中狀態 - 顯示詳細資訊 (有買入價且大於 0) -->
+          <div v-else-if="!pos.isTriggered && pos.buyPrice && pos.buyPrice > 0 && pos.isActive" class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p class="text-xs text-slate-500 mb-1">買入價格</p>
               <p class="text-lg font-bold text-white mono">{{ formatPrice(pos.buyPrice) }}</p>
@@ -315,7 +326,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 回撤進度條 -->
-          <div v-else-if="!pos.isTriggered && pos.isActive" class="mt-4 pt-4 border-t border-trading-border">
+          <div v-else-if="!pos.isTriggered && pos.buyPrice && pos.buyPrice > 0 && pos.isActive" class="mt-4 pt-4 border-t border-trading-border">
             <div class="flex justify-between items-center mb-2">
               <span class="text-xs text-slate-400">回撤幅度</span>
               <span :class="['text-xs font-bold', parseFloat(getDrawdownPercent(pos)) > 7 ? 'text-red-400' : 'text-yellow-400']">

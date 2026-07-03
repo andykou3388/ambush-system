@@ -117,7 +117,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./backend/engine:/app/app/engine
-      - ./backend/classifier:/app/classifier
+      - ./backend/classifier:/app/app/engine
       - /app/__pycache__
       - /app/.pytest_cache
     command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h
@@ -128,7 +128,33 @@ services:
         condition: service_started
     networks:
       - ambush-network
-
+  
+  # Celery Beat 定時任務服務
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - DEBUG=${DEBUG:-true}
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/engine:/app/app/engine
+      - ./backend/classifier:/app/app/engine
+      - /app/__pycache__
+      - /app/.pytest_cache
+    command: celery -A app.celery_app beat --loglevel=info --scheduler celery.schedules:scheduler
+    depends_on:
+      redis:
+        condition: service_started
+      celery_worker:
+        condition: service_started
+    networks:
+      - ambush-network
+  
   prometheus:
     image: prom/prometheus:v2.50.0
     container_name: ambush-prometheus

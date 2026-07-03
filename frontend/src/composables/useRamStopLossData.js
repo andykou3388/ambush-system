@@ -44,9 +44,9 @@ export function useRamStopLossData(options = {}) {
   // 計算屬性 - 統計數據
   // ========================================
   
-  /** 追蹤中的股票數量（未設定買入價） */
+  /** 追蹤中的股票數量（未設定買入價或 buyPrice=0） */
   const trackingCount = computed(() => {
-    return positions.value.filter(p => !p.buyPrice).length
+    return positions.value.filter(p => !p.buyPrice || p.buyPrice === 0).length
   })
   
   /** 監控中的股票數量（已設定買入價且正常運行中） */
@@ -105,7 +105,19 @@ export function useRamStopLossData(options = {}) {
       }
       
       const data = await response.json()
-      positions.value = data || []
+      // 轉換 API 返回的 snake_case 字段為前端使用的 camelCase
+      positions.value = (data || []).map(item => ({
+        ...item,
+        buyPrice: item.buy_price,
+        isTriggered: item.is_triggered,
+        isActive: item.is_active,
+        highestPrice: item.highest_price,
+        currentPrice: item.current_price,
+        stopLossPrice: item.stop_loss_price,
+        drawdownPct: item.drawdown_pct,
+        buyDate: item.buy_date,
+        name: item.name || ''
+      }))
       
       // 更新最後刷新時間（手動刷新才記錄）
       if (!isAutoRefreshing.value) {
@@ -155,13 +167,25 @@ export function useRamStopLossData(options = {}) {
       const result = await response.json()
       
       // 立即更新本地狀態（適配新 response 格式：{ success, message, data: {...} }）
-      const positionData = result.data || result
+      const rawData = result.data || result
+      // 同樣做 snake_case → camelCase 轉換
+      const positionData = {
+        ...rawData,
+        buyPrice: rawData.buy_price ?? rawData.buyPrice,
+        isTriggered: rawData.is_triggered ?? rawData.isTriggered,
+        isActive: true,
+        highestPrice: rawData.highest_price ?? rawData.highestPrice,
+        currentPrice: rawData.current_price ?? rawData.currentPrice,
+        stopLossPrice: rawData.stop_loss_price ?? rawData.stopLossPrice,
+        drawdownPct: rawData.drawdown_pct ?? rawData.drawdownPct,
+        buyDate: rawData.buy_date ?? rawData.buyDate,
+        name: rawData.name || ''
+      }
       const existingIndex = positions.value.findIndex(p => p.code === code)
       if (existingIndex >= 0) {
         positions.value[existingIndex] = {
           ...positions.value[existingIndex],
-          ...positionData,
-          isActive: true
+          ...positionData
         }
       } else {
         positions.value.unshift(positionData)
