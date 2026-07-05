@@ -117,7 +117,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./backend/engine:/app/app/engine
-      - ./backend/classifier:/app/app/engine
+      - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
     command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h
@@ -143,7 +143,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./backend/engine:/app/app/engine
-      - ./backend/classifier:/app/app/engine
+      - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
     command: celery -A app.celery_app beat --loglevel=info --scheduler celery.schedules:scheduler
