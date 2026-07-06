@@ -21,6 +21,7 @@ services:
     env_file:
       - .env
     environment:
+      - TZ=Asia/Taipei
       - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - DEBUG=${DEBUG:-true}
@@ -50,6 +51,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
+      - TZ=Asia/Taipei
       - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
     command: npm run dev -- --host 0.0.0.0
     volumes:
@@ -92,6 +94,8 @@ services:
     image: redis:6-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    environment:
+      - TZ=Asia/Taipei
     volumes:
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-server /usr/local/etc/redis/redis.conf
@@ -111,6 +115,7 @@ services:
     env_file:
       - .env
     environment:
+      - TZ=Asia/Taipei
       - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - DEBUG=${DEBUG:-true}
@@ -120,7 +125,7 @@ services:
       - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
-    command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h
+    command: celery -A app.celery_app worker --loglevel=info --uid=nobody -n worker@%h -Q celery,minute_data
     depends_on:
       db:
         condition: service_healthy
@@ -137,6 +142,7 @@ services:
     env_file:
       - .env
     environment:
+      - TZ=Asia/Taipei
       - DATABASE_URL=${DATABASE_URL:-postgresql://dev_user:dev_pass_123@db:5432/ambush_dev}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - DEBUG=${DEBUG:-true}
@@ -146,7 +152,7 @@ services:
       - ./backend/classifier:/app/classifier
       - /app/__pycache__
       - /app/.pytest_cache
-    command: celery -A app.celery_app beat --loglevel=info --scheduler celery.schedules:scheduler
+    command: celery -A app.celery_app beat --loglevel=info
     depends_on:
       redis:
         condition: service_started
@@ -160,6 +166,8 @@ services:
     container_name: ambush-prometheus
     ports:
       - "127.0.0.1:9090:9090"
+    environment:
+      - TZ=Asia/Taipei
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -181,6 +189,7 @@ services:
       - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
       - grafana_data:/var/lib/grafana
     environment:
+      - TZ=Asia/Taipei
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_INSTALL_PLUGINS=grafana-piechart-panel

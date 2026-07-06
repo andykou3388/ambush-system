@@ -48,11 +48,6 @@ celery_app.conf.beat_schedule = {
         "options": {"queue": "maintenance"},
     },
     # ========== 每週任務（週五） ==========
-    "weekly-calculate-indicators": {
-        "task": "app.tasks.weekly_tasks.calculate_weekly_indicators",
-        "schedule": crontab(hour="14", minute="30", day_of_week="5"),
-        "options": {"queue": "weekly"},
-    },
     "weekly-run-rule-engine": {
         "task": "app.tasks.weekly_tasks.run_weekly_rule_engine",
         "schedule": crontab(hour="15", minute="0", day_of_week="5"),
