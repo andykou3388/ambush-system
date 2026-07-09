@@ -12,6 +12,7 @@ from app.models.system_config import SystemConfig
 from app.models.stock_fundamental_latest import StockFundamentalLatest
 from app.models.stock_bar_minute import StockBarMinute
 from app.models.ram_stop_loss import RamStopLoss
+from app.models.monitored_stock import MonitoredStock
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "UserNotificationConfig",
     "MediaHeat",
     "SystemConfig",
+    "MonitoredStock",
 ]

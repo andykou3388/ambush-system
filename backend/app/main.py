@@ -6,6 +6,7 @@ from app.routers.screener import router as screener_router
 from app.routers.stock_detail import router as stock_detail_router
 from app.routers.stock_fundamental_api import router as stock_fundamental_router
 from app.routers.ram_stop_loss_api import router as ram_stop_loss_router
+from app.routers.monitored_stocks_api import router as monitored_stocks_router
 from app.database import check_db_connection
 
 
@@ -45,3 +46,4 @@ app.include_router(screener_router)
 app.include_router(stock_detail_router)
 app.include_router(stock_fundamental_router)
 app.include_router(ram_stop_loss_router)
+app.include_router(monitored_stocks_router)
