@@ -34,7 +34,7 @@ celery_app.conf.beat_schedule = {
     "fetch-daily-fundamentals": {
         "task": "app.tasks.stock_fundamental_tasks.fetch_stock_fundamentals",
         "schedule": crontab(hour="14", minute="0", day_of_week="1-5"),
-        "args": [["2330.TW", "2317.TW", "2454.TW"]],  # 實際使用時從 DB 讀取
+        # 無參數：任務會自動從 monitored_stocks 表讀取股票清單
         "options": {"queue": "fundamental"},
     },
     "daily-minute-data-validation": {

@@ -42,7 +42,7 @@ def _safe_numeric(value):
 
 def get_insider_net_buy_3m(ticker):
     """
-    從 Ticker 的 insider_transactions 中計算過去 3 個月 (90天) 的內部人淨買入股數。
+    從 Ticker 的 insider_transactions 中計算過去 3 個月 (90 天) 的內部人淨買入股數。
     """
     try:
         df = ticker.insider_transactions
@@ -54,7 +54,7 @@ def get_insider_net_buy_3m(ticker):
         # 2. 確保日期格式正確
         df['Start Date'] = pd.to_datetime(df['Start Date'], errors='coerce')
         
-        # 3. 計算 3 個月 (90天) 前的截止時間
+        # 3. 計算 3 個月 (90 天) 前的截止時間
         cutoff_date = pd.Timestamp.now() - pd.Timedelta(days=90)
         
         # 4. 篩選出過去 3 個月內的交易
@@ -96,7 +96,7 @@ def get_insider_net_buy_3m(ticker):
         return net_shares 
 
     except Exception as e:
-        print(f"[Warning] 計算 {ticker.ticker} 內部人淨買入失敗: {e}")
+        logger.warning(f"計算 {ticker.ticker} 內部人淨買入失敗：{e}")
         return None
 
 
@@ -157,7 +157,7 @@ def save_to_database(data_list: list):
         logger.info(f"批量保存 {len(data_list)} 條基本面數據（含 latest 緩存表）")
     except Exception as e:
         db.rollback()
-        logger.error(f"保存數據失敗: {e}")
+        logger.error(f"保存數據失敗：{e}")
         raise
     finally:
         db.close()
@@ -221,13 +221,9 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                 # ==========================================
                 
                 # 1. pb (市淨率 Price-to-Book)
-                # 注意：如果您資料庫的 pb 其實是指「市盈率」，請改為 info.get('trailingPE')
                 pb = info.get('priceToBook') 
                 
                 # 2. dividend_yield (股息收益率)
-                # 【避坑指南】YFinance 返回的股息率有時是小數(如 0.0339)，有時是百分比(如 3.39)。
-                # 這裡做了一個安全處理：如果小於 1，我們認為它是小數並乘 100 轉為百分比；否則保持原樣。
-                # 請根據您資料庫的設計（存 3.39 還是 0.0339）來微調這行代碼。
                 div_yield_raw = info.get('dividendYield')
                 if div_yield_raw is not None:
                     dividend_yield = (div_yield_raw * 100) if div_yield_raw < 1 else div_yield_raw
@@ -238,7 +234,6 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                 total_market_cap = info.get('marketCap')
                 
                 # 4. net_profit_ttm (最近四季淨利潤 / TTM Net Income)
-                # 優先從 info 中的 netIncomeToCommon 獲取（這通常就是 TTM 數據）
                 net_profit_ttm = info.get('netIncomeToCommon')
                 
                 # 備用方案：如果 info 中沒有，則從年度財報 (income_stmt) 中獲取最新一期的 Net Income
@@ -249,7 +244,7 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                             # 取第一列（最新一期）的 Net Income
                             net_profit_ttm = income_stmt.iloc[0].get('Net Income')
                     except Exception:
-                        pass # 如果財報也抓不到，就保持 None
+                        pass
 
                 fundamental_data = {
                     "code": symbol,
@@ -266,13 +261,12 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
                     "net_profit_ttm": net_profit_ttm,
                     "updated_at": datetime.now(),
                 }
-                print(f"獲取到 {symbol} 的基本面數據: {fundamental_data}")
+                logger.info(f"成功獲取 {symbol} 的基本面數據")
                 batch_fundamental_data.append(fundamental_data)
                 success_count += 1
-                logger.info(f"成功獲取 {symbol} 的基本面數據")
                 
             except Exception as e:
-                logger.error(f"獲取 {symbol} 數據失敗: {e}")
+                logger.error(f"獲取 {symbol} 數據失敗：{e}")
                 failed_symbols.append(symbol)
                 continue
         
@@ -285,7 +279,7 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
         logger.info(f"成功保存 {len(batch_fundamental_data)} 條數據到資料庫")
     
     if failed_symbols:
-        logger.warning(f"有 {len(failed_symbols)} 隻股票獲取失敗: {failed_symbols}")
+        logger.warning(f"有 {len(failed_symbols)} 隻股票獲取失敗：{failed_symbols}")
     
     return {
         "status": "success",
@@ -296,21 +290,31 @@ def _fetch_stock_fundamentals_impl(stock_codes: list):
     }
 
 
+# ==========================================
+# Celery 任務：批量獲取股票基本面數據
+# 支援兩種調用方式：
+#   1. 有參數：使用傳入的 stock_codes（向後相容）
+#   2. 無參數：自動從 monitored_stocks 表讀取待監控股票清單
+# ==========================================
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
-def fetch_stock_fundamentals(self, stock_codes: list):
+def fetch_stock_fundamentals(self, stock_codes: list = None):
     """
-    批量獲取股票基本面數據的通用任務
-    
-    Args:
-        stock_codes: 股票代碼列表，例如 ['2330.TW', '2317.TW', '0700.HK']
-        
-    Returns:
-        dict: 包含處理結果的字典
+    批量獲取股票基本面數據的通用任務（支援自動從 monitored_stocks 讀取）
     """
     try:
+        if not stock_codes:
+            from app.utils.stock_utils import get_tracked_stock_codes
+            stock_codes = get_tracked_stock_codes()
+            logger.info(f"自動從 monitored_stocks 讀取股票清單，共 {len(stock_codes)} 隻")
+
+        if not stock_codes:
+            logger.warning("股票清單為空，跳過本次基本面抓取")
+            return {"status": "skipped", "reason": "股票清單為空"}
+
         return _fetch_stock_fundamentals_impl(stock_codes)
     except Exception as exc:
-        logger.error(f"獲取股票數據失敗: {exc}")
+        logger.error(f"獲取股票數據失敗：{exc}")
         raise self.retry(exc=exc)
 
 
@@ -330,13 +334,10 @@ def fetch_single_stock_fundamental(self, symbol: str):
         ticker = Ticker(symbol)
         info = ticker.info
         
-        # 注意：YFinance 的 debtToEquity 返回的是百分比值（如 140.542），
-        # 需要轉換為小數（如 1.40542）以符合資料庫 NUMERIC(6,4) 的精度
         debt_to_equity = info.get("debtToEquity")
         if debt_to_equity is not None:
             debt_to_equity = round(debt_to_equity / 100, 4)
         
-        # 判斷市場
         if "." in symbol:
             suffix = symbol.split(".")[-1]
             if suffix == "TW":
@@ -348,40 +349,25 @@ def fetch_single_stock_fundamental(self, symbol: str):
         else:
             market = "US"
         
-        # ==========================================
-        # 新增：處理您提到的 4 個特定欄位
-        # ==========================================
-        
-        # 1. pb (市淨率 Price-to-Book)
-        # 注意：如果您資料庫的 pb 其實是指「市盈率」，請改為 info.get('trailingPE')
         pb = info.get('priceToBook') 
         
-        # 2. dividend_yield (股息收益率)
-        # 【避坑指南】YFinance 返回的股息率有時是小數(如 0.0339)，有時是百分比(如 3.39)。
-        # 這裡做了一個安全處理：如果小於 1，我們認為它是小數並乘 100 轉為百分比；否則保持原樣。
-        # 請根據您資料庫的設計（存 3.39 還是 0.0339）來微調這行代碼。
         div_yield_raw = info.get('dividendYield')
         if div_yield_raw is not None:
             dividend_yield = (div_yield_raw * 100) if div_yield_raw < 1 else div_yield_raw
         else:
             dividend_yield = None
 
-        # 3. total_market_cap (總市值)
         total_market_cap = info.get('marketCap')
         
-        # 4. net_profit_ttm (最近四季淨利潤 / TTM Net Income)
-        # 優先從 info 中的 netIncomeToCommon 獲取（這通常就是 TTM 數據）
         net_profit_ttm = info.get('netIncomeToCommon')
         
-        # 備用方案：如果 info 中沒有，則從年度財報 (income_stmt) 中獲取最新一期的 Net Income
         if net_profit_ttm is None:
             try:
                 income_stmt = ticker.income_stmt
                 if income_stmt is not None and not income_stmt.empty:
-                    # 取第一列（最新一期）的 Net Income
                     net_profit_ttm = income_stmt.iloc[0].get('Net Income')
             except Exception:
-                pass # 如果財報也抓不到，就保持 None
+                pass
 
         fundamental_data = {
             "code": symbol,
@@ -404,5 +390,5 @@ def fetch_single_stock_fundamental(self, symbol: str):
         return fundamental_data
         
     except Exception as exc:
-        logger.error(f"獲取 {symbol} 數據失敗: {exc}")
+        logger.error(f"獲取 {symbol} 數據失敗：{exc}")
         raise self.retry(exc=exc)

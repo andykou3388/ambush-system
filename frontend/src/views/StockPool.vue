@@ -40,6 +40,88 @@
       </div>
     </div>
 
+    <!-- ==================== 新增：監控股票管理區塊 ==================== -->
+    <div
+      class="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4 mb-4"
+      :class="{ 'ring-2 ring-amber-500/50': stocks.length === 0 }"
+    >
+      <div v-if="stocks.length === 0" class="mb-3">
+        <h3 class="text-sm font-bold text-amber-400 mb-1 flex items-center gap-2">
+          <span>📡</span> 首次使用？請加入要監控的股票
+        </h3>
+        <p class="text-xs text-slate-500">加入後系統會自動從 YFinance 抓取基本面資料，並每天更新。</p>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+          <span>📡</span>
+          {{ stocks.length === 0 ? '加入第一檔監控股票' : '手動新增監控股票' }}
+        </h3>
+        <button
+          @click="showMonitoredPanel = !showMonitoredPanel"
+          class="text-xs text-slate-400 hover:text-amber-400 transition flex items-center gap-1"
+        >
+          <span>📋</span>
+          已監控 {{ monitoredStocks.length }} 檔
+          <span class="text-xs">{{ showMonitoredPanel ? '▲' : '▼' }}</span>
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">股票代碼</label>
+          <input
+            v-model="newStockCode"
+            placeholder="例: 2330.TW, AAPL, 0700.HK（支援批次）"
+            class="bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded text-sm focus:outline-none focus:border-amber-400 w-64"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 mb-1 block">市場</label>
+          <select
+            v-model="newStockMarket"
+            class="bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded text-sm"
+          >
+            <option value="TW">🇹🇼 台股</option>
+            <option value="US">🇺🇸 美股</option>
+            <option value="HK">🇭🇰 港股</option>
+          </select>
+        </div>
+        <button
+          @click="addAndFetchStock"
+          :disabled="isFetchingStock || !newStockCode.trim()"
+          class="bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2"
+        >
+          <span>{{ isFetchingStock ? '抓取中...' : '＋ 加入並立即抓取基本面' }}</span>
+        </button>
+      </div>
+
+      <div
+        v-if="showMonitoredPanel && monitoredStocks.length > 0"
+        class="mt-3 pt-3 border-t border-amber-700/30"
+      >
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="ms in monitoredStocks"
+            :key="ms.code"
+            class="flex items-center gap-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs"
+          >
+            <span class="font-mono text-slate-200">{{ ms.code }}</span>
+            <span class="text-slate-500">{{ ms.market }}</span>
+            <button
+              @click="removeMonitoredStock(ms.code)"
+              class="text-red-400 hover:text-red-300 ml-1"
+              title="移除監控"
+            >✕</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">
+        新股票將加入監控清單，Celery 排程會自動持續更新其基本面資料
+      </p>
+    </div>
+
     <!-- 篩選控制列 -->
     <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-lg p-4 mb-4">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -436,6 +518,96 @@ const addToTracking = async (stock) => {
   }
 }
 
+// ==================== 新增：監控股票清單操作 ====================
+const newStockCode = ref('')
+const newStockMarket = ref('TW')
+const isFetchingStock = ref(false)
+const monitoredStocks = ref([])
+const showMonitoredPanel = ref(false)
+
+// 取得已監控股票列表
+async function fetchMonitoredStocks() {
+  try {
+    const response = await fetch('/api/v1/monitored-stocks/')
+    if (response.ok) {
+      monitoredStocks.value = await response.json()
+    }
+  } catch (error) {
+    console.error('取得監控清單失敗:', error)
+  }
+}
+
+async function addAndFetchStock() {
+  if (!newStockCode.value.trim()) {
+    showToast('請輸入股票代碼', 'error', '❌')
+    return
+  }
+
+  isFetchingStock.value = true
+  
+  // 支援批次輸入：逗號、空格、換行分隔
+  const codes = newStockCode.value
+    .split(/[,，\n\s]+/)
+    .map(c => c.trim().toUpperCase())
+    .filter(Boolean)
+
+  let successCount = 0
+  let failCount = 0
+
+  for (const code of codes) {
+    try {
+      const response = await fetch('/api/v1/monitored-stocks/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code,
+          market: newStockMarket.value,
+          fetch: true,
+        }),
+      })
+
+      if (response.ok) {
+        successCount++
+      } else {
+        const errData = await response.json().catch(() => ({}))
+        console.error(`${code} 加入失敗:`, errData.detail)
+        failCount++
+      }
+    } catch (error) {
+      console.error(`${code} 加入失敗:`, error)
+      failCount++
+    }
+  }
+
+  if (successCount > 0) {
+    showToast(`✅ ${successCount} 檔股票已加入監控並取得基本面資料`, 'success', '✅')
+    newStockCode.value = ''
+    await fetchStocks()
+    await fetchMonitoredStocks()
+  }
+  if (failCount > 0) {
+    showToast(`❌ ${failCount} 檔股票加入失敗，請確認代碼是否正確`, 'error', '❌')
+  }
+
+  isFetchingStock.value = false
+}
+
+async function removeMonitoredStock(code) {
+  try {
+    const response = await fetch('/api/v1/monitored-stocks/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+    if (response.ok) {
+      showToast(`已移除 ${code} 的監控`, 'info', 'ℹ️')
+      await fetchMonitoredStocks()
+    }
+  } catch (error) {
+    showToast(`移除 ${code} 失敗`, 'error', '❌')
+  }
+}
+
 // 狀態
 const watchlist = ref([])
 const searchQuery = ref('')
@@ -459,6 +631,7 @@ const sortOptions = [
 onMounted(() => {
   fetchStocks()
   loadTrackedSymbols()
+  fetchMonitoredStocks()
   const saved = localStorage.getItem('my_watchlist_v2')
   if (saved) {
     try { watchlist.value = JSON.parse(saved) } catch(e) {}
